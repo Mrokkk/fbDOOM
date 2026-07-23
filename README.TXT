@@ -9,10 +9,11 @@ Runs on:
 * Siglent SSA 3021X Spectrum Analyzer,
 * Frosted OS
 
-To build (example):
-* cd fbdoom
-* make CROSS_COMPILE=arm-linux-gnueabihf-
-
+To build:
+* mkdir build
+* cd build
+* CC=<GCC> cmake -DCMAKE_INSTALL_PREFIX=<install dir> ..
+* make install -j$(nproc)
 
 Original readme
 ===============

@@ -49,6 +49,10 @@ rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 #include <sys/types.h>
 #include <unistd.h>
 
+#ifdef __linux__
+#include <linux/fb.h>
+#endif
+
 //#define CMAP256
 
 struct fb_var_screeninfo fb = {};
@@ -177,7 +181,7 @@ void I_InitGraphics (void)
         I_Error("Could not read framebuffer info: %s\n", strerror(errno));
     }
 
-    I_Printf("Framebuffer: x_res: %zu, y_res: %zu, bpp: %zu\n",
+    I_Printf("Framebuffer: x_res: %u, y_res: %u, bpp: %u\n",
             fb.xres, fb.yres, fb.bits_per_pixel);
 
     if (fb.bits_per_pixel != 32)
@@ -206,13 +210,14 @@ void I_InitGraphics (void)
 
     /* Allocate screen to draw to */
     I_VideoBuffer = (byte*)Z_Malloc (SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);  // For DOOM to draw on
-    I_VideoBuffer_FB = mmap(NULL, fb.yres * fb.xres * 4, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd_fb, 0);
+    I_VideoBuffer_FB = mmap(NULL, fb.yres * fb.xres * 4, PROT_READ | PROT_WRITE, MAP_FILE | MAP_SHARED, fd_fb, 0);
 
     if (I_VideoBuffer_FB == MAP_FAILED)
     {
         I_Error("Could not map /dev/fb0: %s\n", strerror(errno));
     }
 
+#ifdef __phoenix__
     if (ioctl(STDIN_FILENO, KDGETMODE, &old_mode))
     {
         I_Error("Could not check mode: %s\n", strerror(errno));
@@ -225,6 +230,9 @@ void I_InitGraphics (void)
             I_Error("Could not enable graphical mode: %s\n", strerror(errno));
         }
     }
+#else
+    (void)old_mode;
+#endif
 
     memset(I_VideoBuffer_FB, 0, fb.xres * fb.yres * 4);
 
@@ -241,6 +249,7 @@ void I_ShutdownGraphics (void)
     {
         munmap(I_VideoBuffer_FB, fb.xres * fb.yres * 4);
     }
+#ifdef __phoenix__
     if (old_mode != -1)
     {
         if (ioctl(STDIN_FILENO, KDSETMODE, old_mode))
@@ -248,6 +257,7 @@ void I_ShutdownGraphics (void)
             I_Error("Failed to restore old mode: %s\n", strerror(errno));
         }
     }
+#endif
 }
 
 void I_StartFrame (void)
@@ -273,16 +283,14 @@ void I_UpdateNoBlit (void)
 void I_FinishUpdate (void)
 {
     int y;
-    int x_offset, y_offset, x_offset_end;
+    int x_offset, x_offset_end;
     unsigned char *line_in, *line_out;
 
     /* Offsets in case FB is bigger than DOOM */
     /* 600 = fb heigt, 200 screenheight */
     /* 600 = fb heigt, 200 screenheight */
     /* 2048 =fb width, 320 screenwidth */
-    y_offset     = (((fb.yres - (SCREENHEIGHT * fb_scaling)) * fb.bits_per_pixel/8)) / 2;
     x_offset     = (((fb.xres - (SCREENWIDTH  * fb_scaling)) * fb.bits_per_pixel/8)) / 2; // XXX: siglent FB hack: /4 instead of /2, since it seems to handle the resolution in a funny way
-    //x_offset     = 0;
     x_offset_end = ((fb.xres - (SCREENWIDTH  * fb_scaling)) * fb.bits_per_pixel/8) - x_offset;
 
     /* DRAW SCREEN */
@@ -303,7 +311,6 @@ void I_FinishUpdate (void)
                 //XXX FIXME fb_scaling support!
             }
 #else
-            //cmap_to_rgb565((void*)line_out, (void*)line_in, SCREENWIDTH);
             cmap_to_fb((void*)line_out, (void*)line_in, SCREENWIDTH);
 #endif
             line_out += (SCREENWIDTH * fb_scaling * (fb.bits_per_pixel/8)) + x_offset_end;
@@ -405,6 +412,7 @@ void I_EndRead (void)
 
 void I_SetWindowTitle (char *title)
 {
+    (void)title;
 }
 
 void I_GraphicsCheckCommandLine (void)
@@ -413,6 +421,7 @@ void I_GraphicsCheckCommandLine (void)
 
 void I_SetGrabMouseCallback (grabmouse_callback_t func)
 {
+    (void)func;
 }
 
 void I_EnableLoadingDisk(void)
@@ -425,6 +434,7 @@ void I_BindVideoVariables (void)
 
 void I_DisplayFPSDots (boolean dots_on)
 {
+    (void)dots_on;
 }
 
 void I_CheckIsScreensaver (void)

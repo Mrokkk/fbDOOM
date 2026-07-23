@@ -1902,7 +1902,7 @@ void M_LoadDefaults (void)
     else
     {
         doom_defaults.filename
-            = M_StringJoin(configdir, default_main_config, NULL);
+            = M_StringJoin(configdir, "/", default_main_config, NULL);
     }
 
     printf("saving config in %s\n", doom_defaults.filename);

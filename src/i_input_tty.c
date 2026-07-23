@@ -44,6 +44,10 @@
 #include "w_wad.h"
 #include "z_zone.h"
 
+#ifdef __linux__
+#include <linux/kd.h>
+#endif
+
 int vanilla_keyboard_mapping = 1;
 
 // Is the shift key currently down?
