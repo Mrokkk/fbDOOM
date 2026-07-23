@@ -403,6 +403,8 @@ boolean D_GrabMouseCallback(void)
     return (gamestate == GS_LEVEL) && !demoplayback && !advancedemo;
 }
 
+extern int I_InitInput(void);
+
 //
 //  D_DoomLoop
 //
@@ -428,6 +430,7 @@ void D_DoomLoop (void)
     I_GraphicsCheckCommandLine();
     I_SetGrabMouseCallback(D_GrabMouseCallback);
     I_InitGraphics();
+    I_InitInput();
     I_EnableLoadingDisk();
 
     V_RestoreBuffer();

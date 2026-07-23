@@ -2043,32 +2043,9 @@ float M_GetFloatVariable(char *name)
 static char *GetDefaultConfigDir(void)
 {
 #if !defined(_WIN32) || defined(_WIN32_WCE)
-
-    // Configuration settings are stored in ~/.chocolate-doom/,
-    // except on Windows, where we behave like Vanilla Doom and
-    // save in the current directory.
-
-    char *homedir;
-    char *result;
-
-    // frosted HACK - homedir = getenv("HOME");
-    homedir = "/mnt";
-
-    if (homedir != NULL)
-    {
-        // put all configuration in a config directory off the
-        // homedir
-
-        result = M_StringJoin(homedir, DIR_SEPARATOR_S,
-                              "." PACKAGE_TARNAME, DIR_SEPARATOR_S, NULL);
-
-        return result;
-    }
-    else
+    return "/tmp";
 #endif /* #ifndef _WIN32 */
-    {
-        return strdup(FILES_DIR"/");
-    }
+    return FILES_DIR;
 }
 
 // 
@@ -2137,7 +2114,7 @@ char *M_GetSaveGameDir(char *iwadname)
 
         free(topdir);
 #else
-        savegamedir = M_StringJoin(configdir, "savegame/", NULL);
+        savegamedir = M_StringJoin(configdir, "/", "savegame", NULL);
 
         M_MakeDirectory(savegamedir);
 

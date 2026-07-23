@@ -47,6 +47,7 @@ boolean I_ConsoleStdout(void);
 // for normal input.
 ticcmd_t* I_BaseTiccmd (void);
 
+#define I_Printf(fmt, ...) printf("%s: " fmt, __func__, __VA_ARGS__)
 
 // Called by M_Responder when quit is selected.
 // Clean exit, displays sell blurb.

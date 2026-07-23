@@ -26,27 +26,28 @@ static const char
 rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
 
 #include "config.h"
-#include "v_video.h"
-#include "m_argv.h"
 #include "d_event.h"
 #include "d_main.h"
+#include "i_system.h"
 #include "i_video.h"
+#include "m_argv.h"
+#include "v_video.h"
 #include "z_zone.h"
 
 #include "tables.h"
 #include "doomkeys.h"
 
+#include <errno.h>
+#include <fcntl.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <fcntl.h>
-
-#include <stdarg.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <linux/fb.h>
-#include <sys/ioctl.h>
+#include <unistd.h>
 
 //#define CMAP256
 
@@ -70,8 +71,9 @@ byte *I_VideoBuffer_FB = NULL;
 
 /* framebuffer file descriptor */
 int fd_fb = 0;
+long old_mode = -1;
 
-int	X_width;
+int X_width;
 int X_height;
 
 // If true, game is running as a screensaver
@@ -131,28 +133,26 @@ void cmap_to_rgb565(uint16_t * out, uint8_t * in, int in_pixels)
     }
 }
 
-void cmap_to_fb(uint8_t * out, uint8_t * in, int in_pixels)
+void cmap_to_fb(uint32_t * out, uint8_t * in, int in_pixels)
 {
-    int i, j, k;
     struct color c;
     uint32_t pix;
     uint16_t r, g, b;
 
-    for (i = 0; i < in_pixels; i++)
+    for (int i = 0; i < in_pixels; i++)
     {
         c = colors[*in];  /* R:8 G:8 B:8 format! */
-        r = (uint16_t)(c.r >> (8 - fb.red.length));
-        g = (uint16_t)(c.g >> (8 - fb.green.length));
-        b = (uint16_t)(c.b >> (8 - fb.blue.length));
-        pix = r << fb.red.offset;
-        pix |= g << fb.green.offset;
-        pix |= b << fb.blue.offset;
+        r = (uint16_t)(c.r);
+        g = (uint16_t)(c.g);
+        b = (uint16_t)(c.b);
+        pix = r << 16;
+        pix |= g << 8;
+        pix |= b << 0;
+        pix |= 0xff << 24;
 
-        for (k = 0; k < fb_scaling; k++) {
-            for (j = 0; j < fb.bits_per_pixel/8; j++) {
-                *out = (pix >> (j*8));
-                out++;
-            }
+        for (int k = 0; k < fb_scaling; k++)
+        {
+            *out++ = pix;
         }
         in++;
     }
@@ -162,234 +162,105 @@ void I_InitGraphics (void)
 {
     int i;
 
+    I_AtExit(I_ShutdownGraphics, true);
+
     /* Open fbdev file descriptor */
     fd_fb = open("/dev/fb0", O_RDWR);
     if (fd_fb < 0)
     {
-        printf("Could not open /dev/fb0");
-        exit(-1);
+        I_Error("Could not open /dev/fb0: %s\n", strerror(errno));
     }
 
     /* fetch framebuffer info */
-    ioctl(fd_fb, FBIOGET_VSCREENINFO, &fb);
-    /* change params if needed */
-    //ioctl(fd_fb, FBIOPUT_VSCREENINFO, &fb);
-    printf("I_InitGraphics: framebuffer: x_res: %d, y_res: %d, x_virtual: %d, y_virtual: %d, bpp: %d, grayscale: %d\n",
-            fb.xres, fb.yres, fb.xres_virtual, fb.yres_virtual, fb.bits_per_pixel, fb.grayscale);
-
-    printf("I_InitGraphics: framebuffer: RGBA: %d%d%d%d, red_off: %d, green_off: %d, blue_off: %d, transp_off: %d\n",
-            fb.red.length, fb.green.length, fb.blue.length, fb.transp.length, fb.red.offset, fb.green.offset, fb.blue.offset, fb.transp.offset);
-
-    printf("I_InitGraphics: DOOM screen size: w x h: %d x %d\n", SCREENWIDTH, SCREENHEIGHT);
-
-
-    i = M_CheckParmWithArgs("-scaling", 1);
-    if (i > 0) {
-        i = atoi(myargv[i + 1]);
-        fb_scaling = i;
-        printf("I_InitGraphics: Scaling factor: %d\n", fb_scaling);
-    } else {
-        fb_scaling = fb.xres / SCREENWIDTH;
-        if (fb.yres / SCREENHEIGHT < fb_scaling)
-            fb_scaling = fb.yres / SCREENHEIGHT;
-        printf("I_InitGraphics: Auto-scaling factor: %d\n", fb_scaling);
+    if (ioctl(fd_fb, FBIOGET_VSCREENINFO, &fb))
+    {
+        I_Error("Could not read framebuffer info: %s\n", strerror(errno));
     }
 
+    I_Printf("Framebuffer: x_res: %zu, y_res: %zu, bpp: %zu\n",
+            fb.xres, fb.yres, fb.bits_per_pixel);
+
+    if (fb.bits_per_pixel != 32)
+    {
+        I_Error("Expected 32 bits per pixel");
+    }
+
+    I_Printf("DOOM screen size: w x h: %d x %d\n", SCREENWIDTH, SCREENHEIGHT);
+
+    i = M_CheckParmWithArgs("-scaling", 1);
+    if (i > 0)
+    {
+        i = atoi(myargv[i + 1]);
+        fb_scaling = i;
+        I_Printf("Scaling factor: %d\n", fb_scaling);
+    }
+    else
+    {
+        fb_scaling = fb.xres / SCREENWIDTH;
+        if (fb.yres / SCREENHEIGHT < (size_t)fb_scaling)
+        {
+            fb_scaling = fb.yres / SCREENHEIGHT;
+        }
+        I_Printf("Auto-scaling factor: %d\n", fb_scaling);
+    }
 
     /* Allocate screen to draw to */
-	I_VideoBuffer = (byte*)Z_Malloc (SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);  // For DOOM to draw on
-	I_VideoBuffer_FB = (byte*)malloc(fb.xres * fb.yres * (fb.bits_per_pixel/8));     // For a single write() syscall to fbdev
+    I_VideoBuffer = (byte*)Z_Malloc (SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);  // For DOOM to draw on
+    I_VideoBuffer_FB = mmap(NULL, fb.yres * fb.xres * 4, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd_fb, 0);
 
-	screenvisible = true;
+    if (I_VideoBuffer_FB == MAP_FAILED)
+    {
+        I_Error("Could not map /dev/fb0: %s\n", strerror(errno));
+    }
 
-    extern int I_InitInput(void);
-    I_InitInput();
+    if (ioctl(STDIN_FILENO, KDGETMODE, &old_mode))
+    {
+        I_Error("Could not check mode: %s\n", strerror(errno));
+    }
+
+    if (old_mode != KD_GRAPHICS)
+    {
+        if (ioctl(STDIN_FILENO, KDSETMODE, KD_GRAPHICS))
+        {
+            I_Error("Could not enable graphical mode: %s\n", strerror(errno));
+        }
+    }
+
+    memset(I_VideoBuffer_FB, 0, fb.xres * fb.yres * 4);
+
+    screenvisible = true;
 }
 
 void I_ShutdownGraphics (void)
 {
-	Z_Free (I_VideoBuffer);
-	free(I_VideoBuffer_FB);
+    if (I_VideoBuffer)
+    {
+        Z_Free (I_VideoBuffer);
+    }
+    if (I_VideoBuffer_FB)
+    {
+        munmap(I_VideoBuffer_FB, fb.xres * fb.yres * 4);
+    }
+    if (old_mode != -1)
+    {
+        if (ioctl(STDIN_FILENO, KDSETMODE, old_mode))
+        {
+            I_Error("Failed to restore old mode: %s\n", strerror(errno));
+        }
+    }
 }
 
 void I_StartFrame (void)
 {
-
 }
 
 __attribute__ ((weak)) void I_GetEvent (void)
 {
-//	event_t event;
-//	bool button_state;
-//
-//	button_state = button_read ();
-//
-//	if (last_button_state != button_state)
-//	{
-//		last_button_state = button_state;
-//
-//		event.type = last_button_state ? ev_keydown : ev_keyup;
-//		event.data1 = KEY_FIRE;
-//		event.data2 = -1;
-//		event.data3 = -1;
-//
-//		D_PostEvent (&event);
-//	}
-//
-//	touch_main ();
-//
-//	if ((touch_state.x != last_touch_state.x) || (touch_state.y != last_touch_state.y) || (touch_state.status != last_touch_state.status))
-//	{
-//		last_touch_state = touch_state;
-//
-//		event.type = (touch_state.status == TOUCH_PRESSED) ? ev_keydown : ev_keyup;
-//		event.data1 = -1;
-//		event.data2 = -1;
-//		event.data3 = -1;
-//
-//		if ((touch_state.x > 49)
-//		 && (touch_state.x < 72)
-//		 && (touch_state.y > 104)
-//		 && (touch_state.y < 143))
-//		{
-//			// select weapon
-//			if (touch_state.x < 60)
-//			{
-//				// lower row (5-7)
-//				if (touch_state.y < 119)
-//				{
-//					event.data1 = '5';
-//				}
-//				else if (touch_state.y < 131)
-//				{
-//					event.data1 = '6';
-//				}
-//				else
-//				{
-//					event.data1 = '1';
-//				}
-//			}
-//			else
-//			{
-//				// upper row (2-4)
-//				if (touch_state.y < 119)
-//				{
-//					event.data1 = '2';
-//				}
-//				else if (touch_state.y < 131)
-//				{
-//					event.data1 = '3';
-//				}
-//				else
-//				{
-//					event.data1 = '4';
-//				}
-//			}
-//		}
-//		else if (touch_state.x < 40)
-//		{
-//			// button bar at bottom screen
-//			if (touch_state.y < 40)
-//			{
-//				// enter
-//				event.data1 = KEY_ENTER;
-//			}
-//			else if (touch_state.y < 80)
-//			{
-//				// escape
-//				event.data1 = KEY_ESCAPE;
-//			}
-//			else if (touch_state.y < 120)
-//			{
-//				// use
-//				event.data1 = KEY_USE;
-//			}
-//			else if (touch_state.y < 160)
-//			{
-//				// map
-//				event.data1 = KEY_TAB;
-//			}
-//			else if (touch_state.y < 200)
-//			{
-//				// pause
-//				event.data1 = KEY_PAUSE;
-//			}
-//			else if (touch_state.y < 240)
-//			{
-//				// toggle run
-//				if (touch_state.status == TOUCH_PRESSED)
-//				{
-//					run = !run;
-//
-//					event.data1 = KEY_RSHIFT;
-//
-//					if (run)
-//					{
-//						event.type = ev_keydown;
-//					}
-//					else
-//					{
-//						event.type = ev_keyup;
-//					}
-//				}
-//				else
-//				{
-//					return;
-//				}
-//			}
-//			else if (touch_state.y < 280)
-//			{
-//				// save
-//				event.data1 = KEY_F2;
-//			}
-//			else if (touch_state.y < 320)
-//			{
-//				// load
-//				event.data1 = KEY_F3;
-//			}
-//		}
-//		else
-//		{
-//			// movement/menu navigation
-//			if (touch_state.x < 100)
-//			{
-//				if (touch_state.y < 100)
-//				{
-//					event.data1 = KEY_STRAFE_L;
-//				}
-//				else if (touch_state.y < 220)
-//				{
-//					event.data1 = KEY_DOWNARROW;
-//				}
-//				else
-//				{
-//					event.data1 = KEY_STRAFE_R;
-//				}
-//			}
-//			else if (touch_state.x < 180)
-//			{
-//				if (touch_state.y < 160)
-//				{
-//					event.data1 = KEY_LEFTARROW;
-//				}
-//				else
-//				{
-//					event.data1 = KEY_RIGHTARROW;
-//				}
-//			}
-//			else
-//			{
-//				event.data1 = KEY_UPARROW;
-//			}
-//		}
-//
-//		D_PostEvent (&event);
-//	}
 }
 
 __attribute__ ((weak)) void I_StartTic (void)
 {
-	I_GetEvent();
+    I_GetEvent();
 }
 
 void I_UpdateNoBlit (void)
@@ -399,7 +270,6 @@ void I_UpdateNoBlit (void)
 //
 // I_FinishUpdate
 //
-
 void I_FinishUpdate (void)
 {
     int y;
@@ -440,10 +310,6 @@ void I_FinishUpdate (void)
         }
         line_in += SCREENWIDTH;
     }
-
-    /* Start drawing from y-offset */
-    lseek(fd_fb, y_offset * fb.xres, SEEK_SET);
-    write(fd_fb, I_VideoBuffer_FB, (SCREENHEIGHT * fb_scaling * (fb.bits_per_pixel/8)) * fb.xres); /* draw only portion used by doom + x-offsets */
 }
 
 //
@@ -500,8 +366,6 @@ int I_GetPaletteIndex (int r, int g, int b)
     int best, best_diff, diff;
     int i;
     col_t color;
-
-    printf("I_GetPaletteIndex\n");
 
     best = 0;
     best_diff = INT_MAX;

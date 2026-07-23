@@ -16,18 +16,15 @@
 //	DOOM keyboard input via linux tty
 //
 
-
-#include <stdlib.h>
 #include <ctype.h>
-#include <math.h>
-#include <string.h>
-#include <unistd.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <termios.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
-#include <linux/keyboard.h>
-#include <linux/kd.h>
+#include <termios.h>
+#include <unistd.h>
 
 #include "config.h"
 #include "deh_str.h"
@@ -128,15 +125,15 @@ static const char at_to_doom[] =
     /* 0x45 */ KEY_NUMLOCK,
     /* 0x46 */ 0x0,
     /* 0x47 */ 0x0, /* 47 (Keypad-7/Home) */
-    /* 0x48 */ 0x0, /* 48 (Keypad-8/Up) */
+    /* 0x48 */ KEY_UPARROW, /* 48 (Keypad-8/Up) */
     /* 0x49 */ 0x0, /* 49 (Keypad-9/PgUp) */
     /* 0x4a */ 0x0, /* 4a (Keypad--) */
-    /* 0x4b */ 0x0, /* 4b (Keypad-4/Left) */
+    /* 0x4b */ KEY_LEFTARROW, /* 4b (Keypad-4/Left) */
     /* 0x4c */ 0x0, /* 4c (Keypad-5) */
-    /* 0x4d */ 0x0, /* 4d (Keypad-6/Right) */
+    /* 0x4d */ KEY_RIGHTARROW, /* 4d (Keypad-6/Right) */
     /* 0x4e */ 0x0, /* 4e (Keypad-+) */
     /* 0x4f */ 0x0, /* 4f (Keypad-1/End) */
-    /* 0x50 */ 0x0, /* 50 (Keypad-2/Down) */
+    /* 0x50 */ KEY_DOWNARROW, /* 50 (Keypad-2/Down) */
     /* 0x51 */ 0x0, /* 51 (Keypad-3/PgDn) */
     /* 0x52 */ 0x0, /* 52 (Keypad-0/Ins) */
     /* 0x53 */ 0x0, /* 53 (Keypad-./Del) */
@@ -253,25 +250,23 @@ int tty_is_kbd(int fd)
 
 static int old_mode = -1;
 static struct termios old_term;
+static int old_term_read = false;
 static int kb = -1; /* keyboard file descriptor */
 
 void kbd_shutdown(void)
 {
     /* Shut down nicely. */
-
-    printf("Cleaning up.\n");
-    fflush(stdout);
-
-    printf("Exiting normally.\n");
     if (old_mode != -1) {
         ioctl(kb, KDSKBMODE, old_mode);
+    }
+    if (old_term_read) {
         tcsetattr(kb, 0, &old_term);
     }
 
     if (kb > 3)
+    {
         close(kb);
-
-    exit(0);
+    }
 }
 
 static int kbd_init(void)
@@ -279,7 +274,6 @@ static int kbd_init(void)
     struct termios new_term;
     char *files_to_try[] = {"/dev/tty", "/dev/tty0", "/dev/console", NULL};
     int i;
-    int flags;
     int found = 0;
 
     /* First we need to find a file descriptor that represents the
@@ -289,7 +283,7 @@ static int kbd_init(void)
        from a VT. */
     for (i = 0; files_to_try[i] != NULL; i++) {
         /* Try to open the file. */
-        kb = open(files_to_try[i], O_RDONLY);
+        kb = open(files_to_try[i], O_RDONLY | O_NONBLOCK);
         if (kb < 0) continue;
         /* See if this is valid for our purposes. */
         if (tty_is_kbd(kb)) {
@@ -319,19 +313,21 @@ static int kbd_init(void)
         return 1;
     }
 
+    I_AtExit(kbd_shutdown, true);
+
     /* Find the keyboard's mode so we can restore it later. */
     if (ioctl(kb, KDGKBMODE, &old_mode) != 0) {
-        printf("Unable to query keyboard mode.\n");
-        kbd_shutdown();
+        I_Error("Unable to query keyboard mode: %s\n", strerror(errno));
     }
 
     /* Adjust the terminal's settings. In particular, disable
        echoing, signal generation, and line buffering. Any of
        these could cause trouble. Save the old settings first. */
     if (tcgetattr(kb, &old_term) != 0) {
-        printf("Unable to query terminal settings.\n");
-        kbd_shutdown();
+        I_Error("Unable to query terminal settings: %s\n", strerror(errno));
     }
+
+    old_term_read = true;
 
     new_term = old_term;
     new_term.c_iflag = 0;
@@ -340,18 +336,13 @@ static int kbd_init(void)
     /* TCSAFLUSH discards unread input before making the change.
        A good idea. */
     if (tcsetattr(kb, TCSAFLUSH, &new_term) != 0) {
-        printf("Unable to change terminal settings.\n");
-    }
-    
-    /* Put the keyboard in mediumraw mode. */
-    if (ioctl(kb, KDSKBMODE, K_MEDIUMRAW) != 0) {
-        printf("Unable to set mediumraw mode.\n");
-        kbd_shutdown();
+        I_Error("Unable to change terminal settings: %s\n", strerror(errno));
     }
 
-    /* Put in non-blocking mode */
-    flags = fcntl(kb, F_GETFL, 0);
-    fcntl(kb, F_SETFL, flags | O_NONBLOCK);
+    /* Put the keyboard in mediumraw mode. */
+    if (ioctl(kb, KDSKBMODE, K_MEDIUMRAW) != 0) {
+        I_Error("Unable to set mediumraw mode: %s\n", strerror(errno));
+    }
 
     printf("Ready to read keycodes. Press Backspace to exit.\n");
 
@@ -382,9 +373,6 @@ static unsigned char TranslateKey(unsigned char key)
         return at_to_doom[key];
     else
         return 0x0;
-
-    //default:
-    //  return tolower(key);
 }
 
 // Get the equivalent ASCII (Unicode?) character for a keypress.
@@ -425,7 +413,6 @@ static void UpdateShiftStatus(int pressed, unsigned char key)
     }
 }
 
-
 void I_GetEvent(void)
 {
     event_t event;
@@ -433,18 +420,15 @@ void I_GetEvent(void)
     unsigned char key;
 
     // put event-grabbing stuff in here
-    
     while (kbd_read(&pressed, &key))
     {
         if (key == 0x0E) {
-            kbd_shutdown();
             I_Quit();
         }
 
         UpdateShiftStatus(pressed, key);
 
         // process event
-        
         if (!pressed)
         {
             // data1 has the key pressed, data2 has the character
@@ -478,23 +462,10 @@ void I_GetEvent(void)
             break;
         }
     }
-
-
-                /*
-            case SDL_MOUSEMOTION:
-                event.type = ev_mouse;
-                event.data1 = mouse_button_state;
-                event.data2 = AccelerateMouse(sdlevent.motion.xrel);
-                event.data3 = -AccelerateMouse(sdlevent.motion.yrel);
-                D_PostEvent(&event);
-                break;
-                */
 }
 
 void I_InitInput(void)
 {
     kbd_init();
-
-    //UpdateFocus();
 }
 

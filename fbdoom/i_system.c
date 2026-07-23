@@ -28,6 +28,7 @@
 #include <windows.h>
 #else
 #include <unistd.h>
+#include <syslog.h>
 #endif
 
 #ifdef ORIGCODE
@@ -248,8 +249,8 @@ void I_Quit (void)
     atexit_listentry_t *entry;
 
     // Run through all exit functions
- 
-    entry = exit_funcs; 
+
+    entry = exit_funcs;
 
     while (entry != NULL)
     {
@@ -260,8 +261,8 @@ void I_Quit (void)
 #if ORIGCODE
     SDL_Quit();
 
-    exit(0);
 #endif
+    exit(0);
 }
 
 #if !defined(_WIN32) && !defined(__MACOSX__)
@@ -271,7 +272,8 @@ void I_Quit (void)
 
 static int ZenityAvailable(void)
 {
-    return system(ZENITY_BINARY " --help >/dev/null 2>&1") == 0;
+    return 0;
+    /*return system(ZENITY_BINARY " --help >/dev/null 2>&1") == 0;*/
 }
 
 // Escape special characters in the given string so that they can be
@@ -368,6 +370,8 @@ void I_Error (char *error, ...)
         fprintf(stderr, "Warning: recursive call to I_Error detected.\n");
 #if ORIGCODE
         exit(-1);
+#else
+        return;
 #endif
     }
     else
@@ -377,7 +381,6 @@ void I_Error (char *error, ...)
 
     // Message first.
     va_start(argptr, error);
-    //fprintf(stderr, "\nError: ");
     vfprintf(stderr, error, argptr);
     fprintf(stderr, "\n\n");
     va_end(argptr);
@@ -460,9 +463,7 @@ void I_Error (char *error, ...)
 
     exit(-1);
 #else
-    while (true)
-    {
-    }
+    exit(-1);
 #endif
 }
 

@@ -74,8 +74,7 @@ int I_GetTimeMS(void)
 
 void I_Sleep(int ms)
 {
-    //SDL_Delay(ms);
-    usleep (ms * 1000);    
+    usleep (ms * 1000);
 }
 
 void I_WaitVBL(int count)
