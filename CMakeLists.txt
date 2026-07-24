@@ -82,6 +82,7 @@ add_executable(doom
     src/v_video.c
     src/w_checksum.c
     src/w_file.c
+    src/w_file_posix.c
     src/w_file_stdc_unbuffered.c
     src/w_main.c
     src/w_wad.c
