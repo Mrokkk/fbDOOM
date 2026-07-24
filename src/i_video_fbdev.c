@@ -1,4 +1,4 @@
-// Emacs style mode select   -*- C++ -*- 
+// Emacs style mode select   -*- C++ -*-
 //-----------------------------------------------------------------------------
 //
 // $Id:$
@@ -22,26 +22,20 @@
 //
 //-----------------------------------------------------------------------------
 
-static const char
-rcsid[] = "$Id: i_x.c,v 1.6 1997/02/03 22:45:10 b1 Exp $";
-
 #include "config.h"
-#include "d_event.h"
-#include "d_main.h"
 #include "i_system.h"
 #include "i_video.h"
 #include "m_argv.h"
-#include "v_video.h"
 #include "z_zone.h"
 
 #include "tables.h"
-#include "doomkeys.h"
 
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
 #include <sys/socket.h>
@@ -74,11 +68,8 @@ byte *I_VideoBuffer = NULL;
 byte *I_VideoBuffer_FB = NULL;
 
 /* framebuffer file descriptor */
-int fd_fb = 0;
-long old_mode = -1;
-
-int X_width;
-int X_height;
+int fd_fb = -1;
+int old_mode = -1;
 
 // If true, game is running as a screensaver
 
@@ -107,9 +98,9 @@ int usegamma = 0;
 
 typedef struct
 {
-	byte r;
-	byte g;
-	byte b;
+    byte r;
+    byte g;
+    byte b;
 } col_t;
 
 // Palette converted to RGB565
@@ -124,7 +115,7 @@ void cmap_to_rgb565(uint16_t * out, uint8_t * in, int in_pixels)
 
     for (i = 0; i < in_pixels; i++)
     {
-        c = colors[*in]; 
+        c = colors[*in];
         r = ((uint16_t)(c.r >> 3)) << 11;
         g = ((uint16_t)(c.g >> 2)) << 5;
         b = ((uint16_t)(c.b >> 3)) << 0;
@@ -141,7 +132,7 @@ void cmap_to_fb(uint32_t * out, uint8_t * in, int in_pixels)
 {
     struct color c;
     uint32_t pix;
-    uint16_t r, g, b;
+    uint32_t r, g, b;
 
     for (int i = 0; i < in_pixels; i++)
     {
@@ -189,6 +180,8 @@ void I_InitGraphics (void)
         I_Error("Expected 32 bits per pixel");
     }
 
+    size_t fb_size = fb.xres * fb.yres * fb.bits_per_pixel / 8;
+
     I_Printf("DOOM screen size: w x h: %d x %d\n", SCREENWIDTH, SCREENHEIGHT);
 
     i = M_CheckParmWithArgs("-scaling", 1);
@@ -209,8 +202,8 @@ void I_InitGraphics (void)
     }
 
     /* Allocate screen to draw to */
-    I_VideoBuffer = (byte*)Z_Malloc (SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);  // For DOOM to draw on
-    I_VideoBuffer_FB = mmap(NULL, fb.yres * fb.xres * 4, PROT_READ | PROT_WRITE, MAP_FILE | MAP_SHARED, fd_fb, 0);
+    I_VideoBuffer    = Z_Malloc (SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);  // For DOOM to draw on
+    I_VideoBuffer_FB = mmap(NULL, fb_size, PROT_READ | PROT_WRITE, MAP_FILE | MAP_SHARED, fd_fb, 0);
 
     if (I_VideoBuffer_FB == MAP_FAILED)
     {
@@ -234,7 +227,7 @@ void I_InitGraphics (void)
     (void)old_mode;
 #endif
 
-    memset(I_VideoBuffer_FB, 0, fb.xres * fb.yres * 4);
+    memset(I_VideoBuffer_FB, 0, fb_size);
 
     screenvisible = true;
 }
@@ -337,20 +330,7 @@ void I_ReadScreen (byte* scr)
 
 void I_SetPalette (byte* palette)
 {
-	int i;
-	//col_t* c;
-
-	//for (i = 0; i < 256; i++)
-	//{
-	//	c = (col_t*)palette;
-
-	//	rgb565_palette[i] = GFX_RGB565(gammatable[usegamma][c->r],
-	//								   gammatable[usegamma][c->g],
-	//								   gammatable[usegamma][c->b]);
-
-	//	palette += 3;
-	//}
-    
+    int i;
 
     /* performance boost:
      * map to the right pixel format over here! */
@@ -379,9 +359,9 @@ int I_GetPaletteIndex (int r, int g, int b)
 
     for (i = 0; i < 256; ++i)
     {
-    	color.r = GFX_RGB565_R(rgb565_palette[i]);
-    	color.g = GFX_RGB565_G(rgb565_palette[i]);
-    	color.b = GFX_RGB565_B(rgb565_palette[i]);
+        color.r = GFX_RGB565_R(rgb565_palette[i]);
+        color.g = GFX_RGB565_G(rgb565_palette[i]);
+        color.b = GFX_RGB565_B(rgb565_palette[i]);
 
         diff = (r - color.r) * (r - color.r)
              + (g - color.g) * (g - color.g)

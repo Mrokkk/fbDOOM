@@ -16,33 +16,19 @@
 //	DOOM keyboard input via linux tty
 //
 
-#include <ctype.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
 #include "config.h"
-#include "deh_str.h"
 #include "doomtype.h"
 #include "doomkeys.h"
-#include "i_joystick.h"
 #include "i_system.h"
-#include "i_swap.h"
-#include "i_timer.h"
 #include "i_video.h"
-#include "i_scale.h"
-#include "m_argv.h"
-#include "m_config.h"
-#include "m_misc.h"
-#include "tables.h"
-#include "v_video.h"
-#include "w_wad.h"
-#include "z_zone.h"
 
 #ifdef __linux__
 #include <linux/kd.h>
@@ -241,13 +227,13 @@ int tty_is_kbd(int fd)
         return 0;
 
     if (data == KB_84) {
-        printf("84-key keyboard found.\n");
+        printf("84-key keyboard found\n");
         return 1;
     } else if (data == KB_101) {
-        printf("101-key keyboard found.\n");
+        printf("101-key keyboard found\n");
         return 1;
     } else {
-        printf("KDGKBTYPE = 0x%x.\n", data);
+        printf("Unrecognized keyboard: %#x\n", data);
         return 0;
     }
 }
@@ -311,8 +297,8 @@ static int kbd_init(void)
     }
 
     if (!found) {
-        printf("Unable to find a file descriptor associated with "\
-                "the keyboard.\n" \
+        printf("Unable to find a file descriptor associated with "
+                "the keyboard.\n"
                 "Perhaps you're not using a virtual terminal?\n");
         return 1;
     }
@@ -348,8 +334,6 @@ static int kbd_init(void)
         I_Error("Unable to set mediumraw mode: %s\n", strerror(errno));
     }
 
-    printf("Ready to read keycodes. Press Backspace to exit.\n");
-
     return 0;
 }
 
@@ -366,7 +350,7 @@ int kbd_read(int *pressed, unsigned char *key)
 
     /* Print the keycode. The top bit is the pressed/released
        flag, and the lower seven are the keycode. */
-    //printf("%s: 0x%2X (%i)\n", *pressed ? "Released" : " Pressed", (unsigned int)*key, (unsigned int)*key);
+    /*I_Printf("%s: %#02x (%i)\n", *pressed ? "Released" : " Pressed", (unsigned int)*key, (unsigned int)*key);*/
 
     return 1;
 }
@@ -389,7 +373,7 @@ static unsigned char GetTypedChar(unsigned char key)
 
     if (shiftdown > 0)
     {
-        if (key >= 0 && key < arrlen(shiftxform))
+        if (key < arrlen(shiftxform))
         {
             key = shiftxform[key];
         }
@@ -426,10 +410,6 @@ void I_GetEvent(void)
     // put event-grabbing stuff in here
     while (kbd_read(&pressed, &key))
     {
-        if (key == 0x0E) {
-            I_Quit();
-        }
-
         UpdateShiftStatus(pressed, key);
 
         // process event

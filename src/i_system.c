@@ -246,17 +246,9 @@ void I_BindVariables(void)
 
 void I_Quit (void)
 {
-    atexit_listentry_t *entry;
-
     // Run through all exit functions
 
-    entry = exit_funcs;
-
-    while (entry != NULL)
-    {
-        entry->func();
-        entry = entry->next;
-    }
+    I_AtExitRun(false);
 
 #if ORIGCODE
     SDL_Quit();
@@ -358,11 +350,25 @@ static int ZenityErrorBox(char *message)
 
 static boolean already_quitting = false;
 
+void I_AtExitRun(boolean error)
+{
+    atexit_listentry_t *entry = exit_funcs;
+
+    while (entry != NULL)
+    {
+        if (!error || (error && entry->run_on_error))
+        {
+            entry->func();
+        }
+
+        entry = entry->next;
+    }
+}
+
 void I_Error (char *error, ...)
 {
     char msgbuf[512];
     va_list argptr;
-    atexit_listentry_t *entry;
     boolean exit_gui_popup;
 
     if (already_quitting)
@@ -394,17 +400,7 @@ void I_Error (char *error, ...)
 
     // Shutdown. Here might be other errors.
 
-    entry = exit_funcs;
-
-    while (entry != NULL)
-    {
-        if (entry->run_on_error)
-        {
-            entry->func();
-        }
-
-        entry = entry->next;
-    }
+    I_AtExitRun(true);
 
     exit_gui_popup = !M_ParmExists("-nogui");
 
@@ -466,6 +462,27 @@ void I_Error (char *error, ...)
     exit(-1);
 #endif
 }
+
+#ifdef __phoenix__
+void I_Log(char* fmt, ...)
+{
+    static int initialized = 0;
+
+    if (!initialized)
+    {
+        openlog("doom", LOG_PID | LOG_CONS, LOG_USER);
+        initialized = 1;
+    }
+
+    char buffer[512];
+    va_list argptr;
+    va_start(argptr, fmt);
+    vsnprintf(buffer, sizeof(buffer), fmt, argptr);
+    va_end(argptr);
+
+    syslog(LOG_INFO, "%s", buffer);
+}
+#endif
 
 //
 // Read Access Violation emulation.

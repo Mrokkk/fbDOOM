@@ -19,6 +19,7 @@
 #include "config.h"
 
 #include <stdio.h>
+#include <signal.h>
 
 #include "doomtype.h"
 #include "i_system.h"
@@ -32,12 +33,32 @@
 
 void D_DoomMain (void);
 
+void I_SignalHandler(int sig)
+{
+    I_AtExitRun(true);
+    raise(sig);
+}
+
 int main(int argc, char **argv)
 {
     // save arguments
 
     myargc = argc;
     myargv = argv;
+
+    struct sigaction sa;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_handler = &I_SignalHandler;
+    sa.sa_flags = SA_RESETHAND;
+
+    sigaction(SIGABRT, &sa, NULL);
+    sigaction(SIGBUS,  &sa, NULL);
+    sigaction(SIGFPE,  &sa, NULL);
+    sigaction(SIGILL,  &sa, NULL);
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGINT,  &sa, NULL);
+    sigaction(SIGTERM, &sa, NULL);
+    sigaction(SIGQUIT, &sa, NULL);
 
     M_FindResponseFile();
 
@@ -47,4 +68,3 @@ int main(int argc, char **argv)
 
     return 0;
 }
-

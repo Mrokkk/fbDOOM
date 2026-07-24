@@ -47,13 +47,19 @@ boolean I_ConsoleStdout(void);
 // for normal input.
 ticcmd_t* I_BaseTiccmd (void);
 
-#define I_Printf(fmt, ...) printf("%s: " fmt, __func__, __VA_ARGS__)
+#define I_Printf(fmt, ...) printf("%s: " fmt, __func__, ##__VA_ARGS__)
 
 // Called by M_Responder when quit is selected.
 // Clean exit, displays sell blurb.
 void I_Quit (void);
 
 void I_Error (char *error, ...);
+
+#ifdef __phoenix__
+void I_Log(char* fmt, ...);
+#else
+#define I_Log(fmt, ...) printf(fmt "\n", ##__VA_ARGS__)
+#endif
 
 void I_Tactile (int on, int off, int total);
 
@@ -64,6 +70,8 @@ boolean I_GetMemoryValue(unsigned int offset, void *value, int size);
 // is due to an error (I_Error)
 
 void I_AtExit(atexit_func_t func, boolean run_if_error);
+
+void I_AtExitRun(boolean run_on_error);
 
 // Add all system-specific config file variable bindings.
 
