@@ -53,6 +53,7 @@
 #include "p_saveg.h"
 
 #include "i_endoom.h"
+#include "i_input.h"
 #include "i_joystick.h"
 #include "i_system.h"
 #include "i_timer.h"
@@ -84,7 +85,7 @@
 //  calls all ?_Responder, ?_Ticker, and ?_Drawer,
 //  calls I_GetTime, I_StartFrame, and I_StartTic
 //
-void D_DoomLoop (void);
+static void D_DoomLoop (void);
 
 // Location where savegames are stored
 
@@ -333,7 +334,7 @@ void D_Display (void)
 // Add configuration file variable bindings.
 //
 
-void D_BindVariables(void)
+static void D_BindVariables(void)
 {
     int i;
 
@@ -386,7 +387,7 @@ void D_BindVariables(void)
 // Called to determine whether to grab the mouse pointer
 //
 
-boolean D_GrabMouseCallback(void)
+static boolean D_GrabMouseCallback(void)
 {
     // Drone players don't need mouse focus
 
@@ -403,12 +404,10 @@ boolean D_GrabMouseCallback(void)
     return (gamestate == GS_LEVEL) && !demoplayback && !advancedemo;
 }
 
-extern int I_InitInput(void);
-
 //
 //  D_DoomLoop
 //
-void D_DoomLoop (void)
+static void D_DoomLoop (void)
 {
     if (bfgedition &&
         (demorecording || (gameaction == ga_playdemo) || netgame))
@@ -687,7 +686,7 @@ static char *GetGameName(char *gamename)
 
 static void SetMissionForPackName(char *pack_name)
 {
-    int i;
+    size_t i;
     static const struct
     {
         char *name;

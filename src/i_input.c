@@ -13,7 +13,7 @@
 // GNU General Public License for more details.
 //
 // DESCRIPTION:
-//	DOOM keyboard input via linux tty
+//  DOOM keyboard input
 //
 
 #include <errno.h>
@@ -25,8 +25,8 @@
 #include <unistd.h>
 
 #include "config.h"
-#include "doomtype.h"
 #include "doomkeys.h"
+#include "doomtype.h"
 #include "i_system.h"
 #include "i_video.h"
 
@@ -219,20 +219,25 @@ static const char shiftxform[] =
    Returns 1 if it is, 0 if not (or if something prevented us from
    checking). */
 
-int tty_is_kbd(int fd)
+int I_IsKeyboard(int fd)
 {
     int data = 0;
 
     if (ioctl(fd, KDGKBTYPE, &data) != 0)
+    {
         return 0;
+    }
 
-    if (data == KB_84) {
+    if (data == KB_84)
+    {
         printf("84-key keyboard found\n");
         return 1;
-    } else if (data == KB_101) {
+    } else if (data == KB_101)
+    {
         printf("101-key keyboard found\n");
         return 1;
-    } else {
+    } else
+    {
         printf("Unrecognized keyboard: %#x\n", data);
         return 0;
     }
@@ -241,15 +246,17 @@ int tty_is_kbd(int fd)
 static int old_mode = -1;
 static struct termios old_term;
 static int old_term_read = false;
-static int kb = -1; /* keyboard file descriptor */
+static int kb = -1; // keyboard file descriptor
 
-void kbd_shutdown(void)
+void I_ShutdownInput(void)
 {
     /* Shut down nicely. */
-    if (old_mode != -1) {
+    if (old_mode != -1)
+    {
         ioctl(kb, KDSKBMODE, old_mode);
     }
-    if (old_term_read) {
+    if (old_term_read)
+    {
         tcsetattr(kb, 0, &old_term);
     }
 
@@ -259,89 +266,12 @@ void kbd_shutdown(void)
     }
 }
 
-static int kbd_init(void)
-{
-    struct termios new_term;
-    char *files_to_try[] = {"/dev/tty", "/dev/tty0", "/dev/console", NULL};
-    int i;
-    int found = 0;
-
-    /* First we need to find a file descriptor that represents the
-       system's keyboard. This should be /dev/tty, /dev/console,
-       stdin, stdout, or stderr. We'll try them in that order.
-       If none are acceptable, we're probably not being run
-       from a VT. */
-    for (i = 0; files_to_try[i] != NULL; i++) {
-        /* Try to open the file. */
-        kb = open(files_to_try[i], O_RDONLY | O_NONBLOCK);
-        if (kb < 0) continue;
-        /* See if this is valid for our purposes. */
-        if (tty_is_kbd(kb)) {
-            printf("Using keyboard on %s.\n", files_to_try[i]);
-            found = 1;
-            break;
-        }
-        close(kb);
-    }
-
-    /* If those didn't work, not all is lost. We can try the
-       3 standard file descriptors, in hopes that one of them
-       might point to a console. This is not especially likely. */
-    if (files_to_try[i] == NULL) {
-        for (kb = 0; kb < 3; kb++) {
-            if (tty_is_kbd(i)) {
-                found = 1;
-                break;
-            }
-        }
-    }
-
-    if (!found) {
-        printf("Unable to find a file descriptor associated with "
-                "the keyboard.\n"
-                "Perhaps you're not using a virtual terminal?\n");
-        return 1;
-    }
-
-    I_AtExit(kbd_shutdown, true);
-
-    /* Find the keyboard's mode so we can restore it later. */
-    if (ioctl(kb, KDGKBMODE, &old_mode) != 0) {
-        I_Error("Unable to query keyboard mode: %s\n", strerror(errno));
-    }
-
-    /* Adjust the terminal's settings. In particular, disable
-       echoing, signal generation, and line buffering. Any of
-       these could cause trouble. Save the old settings first. */
-    if (tcgetattr(kb, &old_term) != 0) {
-        I_Error("Unable to query terminal settings: %s\n", strerror(errno));
-    }
-
-    old_term_read = true;
-
-    new_term = old_term;
-    new_term.c_iflag = 0;
-    new_term.c_lflag &= ~(ECHO | ICANON | ISIG);
-
-    /* TCSAFLUSH discards unread input before making the change.
-       A good idea. */
-    if (tcsetattr(kb, TCSAFLUSH, &new_term) != 0) {
-        I_Error("Unable to change terminal settings: %s\n", strerror(errno));
-    }
-
-    /* Put the keyboard in mediumraw mode. */
-    if (ioctl(kb, KDSKBMODE, K_MEDIUMRAW) != 0) {
-        I_Error("Unable to set mediumraw mode: %s\n", strerror(errno));
-    }
-
-    return 0;
-}
-
-int kbd_read(int *pressed, unsigned char *key)
+int I_KeyboardRead(int *pressed, unsigned char *key)
 {
     unsigned char data;
 
-    if (read(kb, &data, 1) < 1) {
+    if (read(kb, &data, 1) < 1)
+    {
         return 0;
     }
 
@@ -355,19 +285,18 @@ int kbd_read(int *pressed, unsigned char *key)
     return 1;
 }
 
-static unsigned char TranslateKey(unsigned char key)
+static unsigned char I_TranslateKey(unsigned char key)
 {
-    if (key < sizeof(at_to_doom))
-        return at_to_doom[key];
-    else
-        return 0x0;
+    return key < sizeof(at_to_doom)
+        ? at_to_doom[key]
+        : 0;
 }
 
 // Get the equivalent ASCII (Unicode?) character for a keypress.
 
-static unsigned char GetTypedChar(unsigned char key)
+static unsigned char I_GetAsciiChar(unsigned char key)
 {
-    key = TranslateKey(key);
+    key = I_TranslateKey(key);
 
     // Is shift held down?  If so, perform a translation.
 
@@ -386,17 +315,20 @@ static unsigned char GetTypedChar(unsigned char key)
     return key;
 }
 
-static void UpdateShiftStatus(int pressed, unsigned char key)
+static void I_UpdateShiftStatus(int pressed, unsigned char key)
 {
     int change;
 
-    if (pressed) {
+    if (pressed)
+    {
         change = 1;
-    } else {
+    } else
+    {
         change = -1;
     }
 
-    if (key == 0x2a || key == 0x36) {
+    if (key == 0x2a || key == 0x36)
+    {
         shiftdown += change;
     }
 }
@@ -408,9 +340,9 @@ void I_GetEvent(void)
     unsigned char key;
 
     // put event-grabbing stuff in here
-    while (kbd_read(&pressed, &key))
+    while (I_KeyboardRead(&pressed, &key))
     {
-        UpdateShiftStatus(pressed, key);
+        I_UpdateShiftStatus(pressed, key);
 
         // process event
         if (!pressed)
@@ -418,8 +350,8 @@ void I_GetEvent(void)
             // data1 has the key pressed, data2 has the character
             // (shift-translated, etc)
             event.type = ev_keydown;
-            event.data1 = TranslateKey(key);
-            event.data2 = GetTypedChar(key);
+            event.data1 = I_TranslateKey(key);
+            event.data2 = I_GetAsciiChar(key);
 
             if (event.data1 != 0)
             {
@@ -429,7 +361,7 @@ void I_GetEvent(void)
         else
         {
             event.type = ev_keyup;
-            event.data1 = TranslateKey(key);
+            event.data1 = I_TranslateKey(key);
 
             // data2 is just initialized to zero for ev_keyup.
             // For ev_keydown it's the shifted Unicode character
@@ -450,6 +382,86 @@ void I_GetEvent(void)
 
 void I_InitInput(void)
 {
-    kbd_init();
-}
+    struct termios new_term;
+    char *files_to_try[] = {"/dev/tty", "/dev/tty0", "/dev/console", NULL};
+    int i;
+    int found = 0;
 
+    /* First we need to find a file descriptor that represents the
+       system's keyboard. This should be /dev/tty, /dev/console,
+       stdin, stdout, or stderr. We'll try them in that order.
+       If none are acceptable, we're probably not being run
+       from a VT. */
+    for (i = 0; files_to_try[i] != NULL; i++)
+    {
+        /* Try to open the file. */
+        kb = open(files_to_try[i], O_RDONLY | O_NONBLOCK);
+        if (kb < 0) continue;
+        /* See if this is valid for our purposes. */
+        if (I_IsKeyboard(kb))
+        {
+            printf("Using keyboard on %s.\n", files_to_try[i]);
+            found = 1;
+            break;
+        }
+        close(kb);
+    }
+
+    /* If those didn't work, not all is lost. We can try the
+       3 standard file descriptors, in hopes that one of them
+       might point to a console. This is not especially likely. */
+    if (files_to_try[i] == NULL)
+    {
+        for (kb = 0; kb < 3; kb++)
+        {
+            if (I_IsKeyboard(i))
+            {
+                found = 1;
+                break;
+            }
+        }
+    }
+
+    if (!found)
+    {
+        printf("Unable to find a file descriptor associated with "
+                "the keyboard.\n"
+                "Perhaps you're not using a virtual terminal?\n");
+        return;
+    }
+
+    I_AtExit(I_ShutdownInput, true);
+
+    /* Find the keyboard's mode so we can restore it later. */
+    if (ioctl(kb, KDGKBMODE, &old_mode) != 0)
+    {
+        I_Error("Unable to query keyboard mode: %s\n", strerror(errno));
+    }
+
+    /* Adjust the terminal's settings. In particular, disable
+       echoing, signal generation, and line buffering. Any of
+       these could cause trouble. Save the old settings first. */
+    if (tcgetattr(kb, &old_term) != 0)
+    {
+        I_Error("Unable to query terminal settings: %s\n", strerror(errno));
+    }
+
+    old_term_read = true;
+
+    new_term = old_term;
+    new_term.c_iflag = 0;
+    new_term.c_lflag &= ~(ECHO | ICANON | ISIG);
+
+    /* TCSAFLUSH discards unread input before making the change.
+       A good idea. */
+    if (tcsetattr(kb, TCSAFLUSH, &new_term) != 0)
+    {
+        I_Error("Unable to change terminal settings: %s\n", strerror(errno));
+    }
+
+    /* Put the keyboard in mediumraw mode. */
+    if (ioctl(kb, KDSKBMODE, K_MEDIUMRAW) != 0)
+    {
+        I_Error("Unable to set mediumraw mode: %s\n", strerror(errno));
+    }
+}

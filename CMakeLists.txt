@@ -26,7 +26,7 @@ add_executable(doom
     src/hu_stuff.c
     src/i_cdmus.c
     src/i_endoom.c
-    src/i_input_tty.c
+    src/i_input.c
     src/i_joystick.c
     src/i_main.c
     src/i_scale.c
