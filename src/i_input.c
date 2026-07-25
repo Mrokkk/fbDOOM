@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 #include "config.h"
+#include "d_event.h"
 #include "doomkeys.h"
 #include "doomtype.h"
 #include "i_system.h"
@@ -35,6 +36,19 @@
 #endif
 
 int vanilla_keyboard_mapping = 1;
+
+// Mouse acceleration
+//
+// This emulates some of the behavior of DOS mouse drivers by increasing
+// the speed when the mouse is moved fast.
+//
+// The mouse input values are input directly to the game, but when
+// the values exceed the value of mouse_threshold, they are multiplied
+// by mouse_acceleration to increase the speed.
+
+int usemouse = 1;
+float mouse_acceleration = 3.0;
+int mouse_threshold = 2;
 
 // Is the shift key currently down?
 
@@ -247,10 +261,10 @@ static int old_mode = -1;
 static struct termios old_term;
 static int old_term_read = false;
 static int kb = -1; // keyboard file descriptor
+static int mouse = -1; // mouse file descriptor
 
 void I_ShutdownInput(void)
 {
-    /* Shut down nicely. */
     if (old_mode != -1)
     {
         ioctl(kb, KDSKBMODE, old_mode);
@@ -264,13 +278,17 @@ void I_ShutdownInput(void)
     {
         close(kb);
     }
+    if (mouse != -1)
+    {
+        close(mouse);
+    }
 }
 
-int I_KeyboardRead(int *pressed, unsigned char *key)
+static int I_KeyboardRead(int *pressed, unsigned char *key)
 {
     unsigned char data;
 
-    if (read(kb, &data, 1) < 1)
+    if (read(kb, &data, 1) != 1)
     {
         return 0;
     }
@@ -283,6 +301,30 @@ int I_KeyboardRead(int *pressed, unsigned char *key)
     /*I_Printf("%s: %#02x (%i)\n", *pressed ? "Released" : " Pressed", (unsigned int)*key, (unsigned int)*key);*/
 
     return 1;
+}
+
+int I_MouseRead(char* buf)
+{
+    static char mouse_buf[3];
+    static size_t index;
+
+    int res = read(mouse, mouse_buf + index, 3 - index);
+
+    if (res < 0)
+    {
+        return 0;
+    }
+
+    index += res;
+
+    if (index == 3)
+    {
+        index = 0;
+        memcpy(buf, mouse_buf, 3);
+        return 1;
+    }
+
+    return 0;
 }
 
 static unsigned char I_TranslateKey(unsigned char key)
@@ -322,7 +364,8 @@ static void I_UpdateShiftStatus(int pressed, unsigned char key)
     if (pressed)
     {
         change = 1;
-    } else
+    }
+    else
     {
         change = -1;
     }
@@ -338,6 +381,7 @@ void I_GetEvent(void)
     event_t event;
     int pressed;
     unsigned char key;
+    char mouse_buf[3];
 
     // put event-grabbing stuff in here
     while (I_KeyboardRead(&pressed, &key))
@@ -375,15 +419,25 @@ void I_GetEvent(void)
             {
                 D_PostEvent(&event);
             }
-            break;
         }
+    }
+
+    while (I_MouseRead(mouse_buf))
+    {
+        event.type = ev_mouse;
+        event.data1 = mouse_buf[0] & 7;
+        event.data2 = mouse_buf[1] * 5;
+        event.data3 = 0;
+
+        D_PostEvent(&event);
     }
 }
 
 void I_InitInput(void)
 {
     struct termios new_term;
-    char *files_to_try[] = {"/dev/tty", "/dev/tty0", "/dev/console", NULL};
+    const char *keyboard_files[] = {"/dev/tty", "/dev/tty0", "/dev/console", NULL};
+    const char *mouse_files[] = {"/dev/mouse", NULL};
     int i;
     int found = 0;
 
@@ -392,25 +446,35 @@ void I_InitInput(void)
        stdin, stdout, or stderr. We'll try them in that order.
        If none are acceptable, we're probably not being run
        from a VT. */
-    for (i = 0; files_to_try[i] != NULL; i++)
+    for (i = 0; keyboard_files[i]; i++)
     {
         /* Try to open the file. */
-        kb = open(files_to_try[i], O_RDONLY | O_NONBLOCK);
+        kb = open(keyboard_files[i], O_RDONLY | O_NONBLOCK);
         if (kb < 0) continue;
         /* See if this is valid for our purposes. */
         if (I_IsKeyboard(kb))
         {
-            printf("Using keyboard on %s.\n", files_to_try[i]);
+            printf("Using keyboard on %s.\n", keyboard_files[i]);
             found = 1;
             break;
         }
         close(kb);
     }
 
+    for (i = 0; mouse_files[i]; ++i)
+    {
+        mouse = open(mouse_files[i], O_RDONLY | O_NONBLOCK);
+        if (mouse > 0)
+        {
+            usemouse = 0;
+            break;
+        }
+    }
+
     /* If those didn't work, not all is lost. We can try the
        3 standard file descriptors, in hopes that one of them
        might point to a console. This is not especially likely. */
-    if (files_to_try[i] == NULL)
+    if (keyboard_files[i] == NULL)
     {
         for (kb = 0; kb < 3; kb++)
         {

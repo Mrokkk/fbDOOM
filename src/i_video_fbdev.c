@@ -51,7 +51,6 @@
 
 struct fb_var_screeninfo fb = {};
 int fb_scaling = 1;
-int usemouse = 0;
 
 struct color {
     uint32_t b:8;
@@ -79,18 +78,6 @@ boolean screensaver_mode = false;
 // when the screen isnt visible, don't render the screen
 
 boolean screenvisible;
-
-// Mouse acceleration
-//
-// This emulates some of the behavior of DOS mouse drivers by increasing
-// the speed when the mouse is moved fast.
-//
-// The mouse input values are input directly to the game, but when
-// the values exceed the value of mouse_threshold, they are multiplied
-// by mouse_acceleration to increase the speed.
-
-float mouse_acceleration = 2.0;
-int mouse_threshold = 10;
 
 // Gamma correction level to use
 

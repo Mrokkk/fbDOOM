@@ -18,11 +18,12 @@
 //
 
 
+#include <ctype.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
-#include <errno.h>
+#include <unistd.h>
 
 #include "config.h"
 
@@ -1708,6 +1709,8 @@ static void SaveDefaultCollection(default_collection_t *collection)
     }
 
     fclose (f);
+#else
+    (void)collection;
 #endif
 }
 
@@ -1718,9 +1721,9 @@ static int ParseIntParameter(char *strparm)
     int parm;
 
     if (strparm[0] == '0' && strparm[1] == 'x')
-        sscanf(strparm+2, "%x", &parm);
+        parm = strtol(strparm, NULL, 16);
     else
-        sscanf(strparm, "%i", &parm);
+        parm = strtol(strparm, NULL, 10);
 
     return parm;
 }
@@ -1828,6 +1831,74 @@ static void LoadDefaultCollection(default_collection_t *collection)
     }
 
     fclose (f);
+#else
+    FILE *f = fopen(collection->filename, "r");
+
+    if (!f)
+    {
+        return;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char* file_buf = malloc(size + 1);
+
+    if (!file_buf)
+    {
+        return;
+    }
+
+    int len = fread(file_buf, 1, size, f);
+
+    if (len < 0)
+    {
+        return;
+    }
+
+    file_buf[len] = '\0';
+
+    char *line = NULL;
+    char *input = file_buf;
+    char *key, *value, *tmp1, *tmp2;
+    default_t *def;
+    int line_nr = 1;
+
+    I_Printf("reading %s\n", collection->filename);
+
+    for (;; input = NULL, line_nr++)
+    {
+        line = strtok_r(input, "\n\r", &tmp1);
+
+        if (!line)
+        {
+            break;
+        }
+
+        key = strtok_r(line, " ", &tmp2);
+        value = strtok_r(NULL, " ", &tmp2);
+
+        if (!key || !value)
+        {
+            continue;
+        }
+
+        def = SearchCollection(collection, key);
+
+        if (def == NULL || !def->bound)
+        {
+            // Unknown variable?  Unbound variables are also treated
+            // as unknown.
+            printf("  %s:%u: Unknown variable: %s\n", collection->filename, line_nr, key);
+            continue;
+        }
+
+        SetVariable(def, value);
+    }
+
+    free(file_buf);
+    fclose(f);
 #endif
 }
 
@@ -1896,13 +1967,12 @@ void M_LoadDefaults (void)
 
     if (i)
     {
-	doom_defaults.filename = myargv[i+1];
-	printf ("	default file: %s\n",doom_defaults.filename);
+        doom_defaults.filename = myargv[i+1];
+        printf ("  default file: %s\n",doom_defaults.filename);
     }
     else
     {
-        doom_defaults.filename
-            = M_StringJoin(configdir, "/", default_main_config, NULL);
+        doom_defaults.filename = M_StringJoin(configdir, "/", default_main_config, NULL);
     }
 
     printf("saving config in %s\n", doom_defaults.filename);
@@ -1919,13 +1989,11 @@ void M_LoadDefaults (void)
     if (i)
     {
         extra_defaults.filename = myargv[i+1];
-        printf("        extra configuration file: %s\n", 
-               extra_defaults.filename);
+        printf("        extra configuration file: %s\n", extra_defaults.filename);
     }
     else
     {
-        extra_defaults.filename
-            = M_StringJoin(configdir, default_extra_config, NULL);
+        extra_defaults.filename = M_StringJoin(configdir, "/", default_extra_config, NULL);
     }
 
     LoadDefaultCollection(&doom_defaults);
@@ -2042,9 +2110,6 @@ float M_GetFloatVariable(char *name)
 
 static char *GetDefaultConfigDir(void)
 {
-#if !defined(_WIN32) || defined(_WIN32_WCE)
-    return "/tmp";
-#endif /* #ifndef _WIN32 */
     return FILES_DIR;
 }
 
@@ -2089,6 +2154,7 @@ char *M_GetSaveGameDir(char *iwadname)
 #if ORIGCODE
     char *topdir;
 #endif
+    (void)iwadname;
 
     // If not "doing" a configuration directory (Windows), don't "do"
     // a savegame directory, either.
@@ -2124,4 +2190,3 @@ char *M_GetSaveGameDir(char *iwadname)
 
     return savegamedir;
 }
-
