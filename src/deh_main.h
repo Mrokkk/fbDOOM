@@ -19,8 +19,8 @@
 #define DEH_MAIN_H
 
 #include "doomtype.h"
-#include "doomfeatures.h"
-#include "deh_str.h"
+#include "doomfeatures.h" // IWYU pragma: export
+#include "deh_str.h" // IWYU pragma: export
 #include "sha1.h"
 
 // These are the limits that dehacked uses (from dheinit.h in the dehacked

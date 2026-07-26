@@ -1,9 +1,37 @@
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.14)
+
 project(fbDOOM C)
 
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+option(LTO         "Enable Link Time Optimization" OFF)
+option(OPTIMIZE    "Enable compiler optimizations" ON)
+option(SANITIZE    "Enable ASan and UBsan"         OFF)
+option(PROFILE     "Enable profiling"              OFF)
 
-set(CMAKE_C_FLAGS "-pipe -ggdb3 -O3 -Wall -Wextra")
+message(STATUS "Enable Link Time Optimization: ${LTO}")
+message(STATUS "Enable compiler optimizations: ${OPTIMIZE}")
+message(STATUS "Enable ASan and UBsan:         ${SANITIZE}")
+message(STATUS "Enable profiling:              ${PROFILE}")
+
+set(CMAKE_C_STANDARD 90)
+add_compile_options(-pipe -ggdb3 -Wall -Wextra -fdata-sections -ffunction-sections -Wno-unused-parameter)
+add_link_options(-Wl,--gc-sections)
+
+if(PROFILE)
+    add_compile_options(-fno-omit-frame-pointer)
+endif()
+
+if(SANITIZE)
+    add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+    add_link_options(-Wl,-lasan -Wl,-lubsan)
+endif()
+
+if(OPTIMIZE)
+    add_compile_options(-O3)
+endif()
+
+if(LTO)
+    add_compile_options(-flto=auto)
+endif()
 
 add_executable(doom
 
@@ -29,11 +57,10 @@ add_executable(doom
     src/i_input.c
     src/i_joystick.c
     src/i_main.c
-    src/i_scale.c
     src/i_sound.c
     src/i_system.c
     src/i_timer.c
-    src/i_video_fbdev.c
+    src/i_video.c
     src/info.c
     src/m_argv.c
     src/m_bbox.c
@@ -92,6 +119,8 @@ add_executable(doom
 )
 
 install(TARGETS doom)
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 execute_process(
     COMMAND ${CMAKE_COMMAND} -E create_symlink

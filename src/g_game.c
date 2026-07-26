@@ -28,16 +28,17 @@
 #include "deh_main.h"
 #include "deh_misc.h"
 
-#include "z_zone.h"
 #include "f_finale.h"
-#include "m_argv.h"
-#include "m_controls.h"
-#include "m_misc.h"
-#include "m_menu.h"
-#include "m_random.h"
+#include "i_input.h"
 #include "i_system.h"
 #include "i_timer.h"
 #include "i_video.h"
+#include "m_argv.h"
+#include "m_controls.h"
+#include "m_menu.h"
+#include "m_misc.h"
+#include "m_random.h"
+#include "z_zone.h"
 
 #include "p_setup.h"
 #include "p_saveg.h"
@@ -281,7 +282,7 @@ static boolean WeaponSelectable(weapontype_t weapon)
 static int G_NextWeapon(int direction)
 {
     weapontype_t weapon;
-    int start_i, i;
+    size_t start_i, i;
 
     // Find index in the table.
 
@@ -294,7 +295,7 @@ static int G_NextWeapon(int direction)
         weapon = players[consoleplayer].pendingweapon;
     }
 
-    for (i=0; i<arrlen(weapon_order_table); ++i)
+    for (i = 0; i < arrlen(weapon_order_table); ++i)
     {
         if (weapon_order_table[i].weapon == weapon)
         {
@@ -321,7 +322,7 @@ static int G_NextWeapon(int direction)
 // 
 void G_BuildTiccmd (ticcmd_t* cmd, int maketic) 
 { 
-    int		i; 
+    size_t	i; 
     boolean	strafe;
     boolean	bstrafe; 
     int		speed;
@@ -1489,33 +1490,34 @@ void G_DoCompleted (void)
 
 
 //
-// G_WorldDone 
+// G_WorldDone
 //
-void G_WorldDone (void) 
-{ 
-    gameaction = ga_worlddone; 
+void G_WorldDone (void)
+{
+    gameaction = ga_worlddone;
 
-    if (secretexit) 
-	players[consoleplayer].didsecret = true; 
+    if (secretexit)
+        players[consoleplayer].didsecret = true;
 
     if ( gamemode == commercial )
     {
-	switch (gamemap)
-	{
-	  case 15:
-	  case 31:
-	    if (!secretexit)
-		break;
-	  case 6:
-	  case 11:
-	  case 20:
-	  case 30:
-	    F_StartFinale ();
-	    break;
-	}
+        switch (gamemap)
+        {
+            case 15:
+            case 31:
+                if (!secretexit)
+                    break;
+                FALLTHROUGH;
+            case 6:
+            case 11:
+            case 20:
+            case 30:
+                F_StartFinale ();
+                break;
+        }
     }
-} 
- 
+}
+
 void G_DoWorldDone (void) 
 {        
     gamestate = GS_LEVEL; 

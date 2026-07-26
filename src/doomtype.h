@@ -13,29 +13,14 @@
 // GNU General Public License for more details.
 //
 // DESCRIPTION:
-//	Simple basic typedefs, isolated here to make it easier
-//	 separating modules.
-//    
-
+//  Simple basic typedefs, isolated here to make it easier
+//   separating modules.
+//
 
 #ifndef __DOOMTYPE__
 #define __DOOMTYPE__
 
-// #define macros to provide functions missing in Windows.
-// Outside Windows, we use strings.h for str[n]casecmp.
-
-
-#ifdef _WIN32
-
-#define strcasecmp stricmp
-#define strncasecmp strnicmp
-
-#else
-
 #include <strings.h>
-
-#endif
-
 
 //
 // The packed attribute forces structures to be packed into the minimum 
@@ -47,10 +32,16 @@
 //
 
 #ifdef __GNUC__
-#define PACKEDATTR __attribute__((packed))
+#define PACKEDATTR  __attribute__((packed))
+#define NORETURN    __attribute__((noreturn))
+#define FALLTHROUGH __attribute__((fallthrough))
 #else
 #define PACKEDATTR
+#define NORETURN
+#define FALLTHROUGH
 #endif
+
+#define UNUSED(...) (void)(__VA_ARGS__)
 
 // C99 integer types; with gcc we just use this.  Other compilers 
 // should add conditional statements that define the C99 types.
@@ -62,14 +53,6 @@
 
 #include <inttypes.h>
 
-#ifdef __cplusplus
-
-// Use builtin bool type with C++.
-
-typedef bool boolean;
-
-#else
-
 typedef int boolean;
 
 #ifndef false
@@ -80,27 +63,13 @@ typedef int boolean;
 #define true 1
 #endif
 
-#endif
-
 typedef uint8_t byte;
 
 #include <limits.h>
 
-#ifdef _WIN32
-
-#define DIR_SEPARATOR '\\'
-#define DIR_SEPARATOR_S "\\"
-#define PATH_SEPARATOR ';'
-
-#else
-
 #define DIR_SEPARATOR '/'
 #define DIR_SEPARATOR_S "/"
-#define PATH_SEPARATOR ':'
-
-#endif
 
 #define arrlen(array) (sizeof(array) / sizeof(*array))
 
 #endif
-

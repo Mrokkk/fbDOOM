@@ -17,24 +17,17 @@
 //	all OS independend parts.
 //
 
-#include <stdlib.h>
-
-#include "doomfeatures.h"
-
 #include "d_main.h"
 #include "m_argv.h"
 #include "m_menu.h"
 #include "m_misc.h"
-#include "i_system.h"
-#include "i_timer.h"
-#include "i_video.h"
 #include "g_game.h"
 #include "doomdef.h"
 #include "doomstat.h"
 #include "w_checksum.h"
 #include "w_wad.h"
 
-#include "deh_main.h"
+#include "deh_str.h"
 
 #include "d_loop.h"
 
@@ -62,7 +55,7 @@ static void PlayerQuitGame(player_t *player)
 
     // TODO: check if it is sensible to do this:
 
-    if (demorecording) 
+    if (demorecording)
     {
         G_CheckDemoStatus ();
     }
@@ -107,7 +100,7 @@ static loop_interface_t doom_loop_interface = {
 
 static void LoadGameSettings(net_gamesettings_t *settings)
 {
-    unsigned int i;
+    int i;
 
     deathmatch = settings->deathmatch;
     startepisode = settings->episode;
@@ -173,7 +166,7 @@ static void InitConnectData(net_connect_data_t *connect_data)
         connect_data->drone = true;
     }
 
-    //! 
+    //!
     // @category net
     //
     // Run as the right screen in three screen mode.

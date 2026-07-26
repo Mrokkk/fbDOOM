@@ -49,9 +49,9 @@ static struct
 
 boolean D_ValidGameMode(GameMission_t mission, GameMode_t mode)
 {
-    int i;
+    size_t i;
 
-    for (i=0; i<arrlen(valid_modes); ++i)
+    for (i = 0; i < arrlen(valid_modes); ++i)
     {
         if (valid_modes[i].mode == mode && valid_modes[i].mission == mission)
         {
@@ -62,10 +62,9 @@ boolean D_ValidGameMode(GameMission_t mission, GameMode_t mode)
     return false;
 }
 
-boolean D_ValidEpisodeMap(GameMission_t mission, GameMode_t mode,
-                          int episode, int map)
+boolean D_ValidEpisodeMap(GameMission_t mission, GameMode_t mode, int episode, int map)
 {
-    int i;
+    size_t i;
 
     // Hacks for Heretic secret episodes
 
@@ -83,10 +82,10 @@ boolean D_ValidEpisodeMap(GameMission_t mission, GameMode_t mode,
 
     // Find the table entry for this mission/mode combination.
 
-    for (i=0; i<arrlen(valid_modes); ++i) 
+    for (i = 0; i < arrlen(valid_modes); ++i)
     {
-        if (mission == valid_modes[i].mission
-         && mode == valid_modes[i].mode)
+        if (mission == valid_modes[i].mission &&
+            mode == valid_modes[i].mode)
         {
             return episode >= 1 && episode <= valid_modes[i].episode
                 && map >= 1 && map <= valid_modes[i].map;
@@ -134,7 +133,7 @@ static struct {
 
 boolean D_ValidGameVersion(GameMission_t mission, GameVersion_t version)
 {
-    int i;
+    size_t i;
 
     // All Doom variants can use the Doom versions.
 
@@ -144,10 +143,10 @@ boolean D_ValidGameVersion(GameMission_t mission, GameVersion_t version)
         mission = doom;
     }
 
-    for (i=0; i<arrlen(valid_versions); ++i) 
+    for (i = 0; i < arrlen(valid_versions); ++i)
     {
-        if (valid_versions[i].mission == mission 
-         && valid_versions[i].version == version)
+        if (valid_versions[i].mission == mission &&
+            valid_versions[i].version == version)
         {
             return true;
         }
@@ -206,4 +205,3 @@ char *D_GameMissionString(GameMission_t mission)
             return "strife";
     }
 }
-

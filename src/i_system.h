@@ -20,9 +20,9 @@
 #ifndef __I_SYSTEM__
 #define __I_SYSTEM__
 
-#include "d_ticcmd.h"
 #include "d_event.h"
-
+#include "d_ticcmd.h"
+#include "doomtype.h"
 
 typedef void (*atexit_func_t)(void);
 
@@ -53,7 +53,7 @@ ticcmd_t* I_BaseTiccmd (void);
 // Clean exit, displays sell blurb.
 void I_Quit (void);
 
-void I_Error (char *error, ...);
+void NORETURN I_Error (char *error, ...);
 
 #ifdef __phoenix__
 void I_Log(char* fmt, ...);

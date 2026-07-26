@@ -17,48 +17,21 @@
 
 
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-
 #include <stdarg.h>
-
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#else
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <syslog.h>
-#endif
-
-#ifdef ORIGCODE
-#include "SDL.h"
-#endif
 
 #include "config.h"
-
-#include "deh_str.h"
 #include "doomtype.h"
-#include "m_argv.h"
-#include "m_config.h"
-#include "m_misc.h"
-#include "i_joystick.h"
-#include "i_sound.h"
-#include "i_timer.h"
-#include "i_video.h"
-
 #include "i_system.h"
-
-#include "w_wad.h"
-#include "z_zone.h"
-
-#ifdef __MACOSX__
-#include <CoreFoundation/CFUserNotification.h>
-#endif
+#include "m_argv.h"
+#include "m_misc.h"
 
 #define DEFAULT_RAM 6 /* MiB */
 #define MIN_RAM     6  /* MiB */
-
 
 typedef struct atexit_listentry_s atexit_listentry_t;
 
@@ -87,6 +60,7 @@ void I_AtExit(atexit_func_t func, boolean run_on_error)
 
 void I_Tactile(int on, int off, int total)
 {
+    UNUSED(on && off && total);
 }
 
 // Zone memory auto-allocation function that allocates the zone size
@@ -158,8 +132,7 @@ byte *I_ZoneBase (int *size)
 
     zonemem = AutoAllocMemory(size, default_ram, min_ram);
 
-    printf("zone memory: %p, %x allocated for zone\n", 
-           zonemem, *size);
+    printf("zone memory: %p, %x allocated for zone\n", zonemem, *size);
 
     return zonemem;
 }
@@ -192,17 +165,17 @@ void I_PrintStartupBanner(char *gamedescription)
     I_PrintDivider();
     I_PrintBanner(gamedescription);
     I_PrintDivider();
-    
+
     printf(
-    " " PACKAGE_NAME " is free software, covered by the GNU General Public\n"
-    " License.  There is NO warranty; not even for MERCHANTABILITY or FITNESS\n"
-    " FOR A PARTICULAR PURPOSE. You are welcome to change and distribute\n"
-    " copies under certain conditions. See the source for more information.\n");
+        " " PACKAGE_NAME " is free software, covered by the GNU General Public\n"
+        " License.  There is NO warranty; not even for MERCHANTABILITY or FITNESS\n"
+        " FOR A PARTICULAR PURPOSE. You are welcome to change and distribute\n"
+        " copies under certain conditions. See the source for more information.\n");
 
     I_PrintDivider();
 }
 
-// 
+//
 // I_ConsoleStdout
 //
 // Returns true if stdout is a real console, false if it is a file
@@ -210,35 +183,8 @@ void I_PrintStartupBanner(char *gamedescription)
 
 boolean I_ConsoleStdout(void)
 {
-#ifdef _WIN32
-    // SDL "helpfully" always redirects stdout to a file.
-    return 0;
-#else
-#if ORIGCODE
     return isatty(fileno(stdout));
-#else
-	return 0;
-#endif
-#endif
 }
-
-//
-// I_Init
-//
-/*
-void I_Init (void)
-{
-    I_CheckIsScreensaver();
-    I_InitTimer();
-    I_InitJoystick();
-}
-void I_BindVariables(void)
-{
-    I_BindVideoVariables();
-    I_BindJoystickVariables();
-    I_BindSoundVariables();
-}
-*/
 
 //
 // I_Quit
@@ -250,99 +196,8 @@ void I_Quit (void)
 
     I_AtExitRun(false);
 
-#if ORIGCODE
-    SDL_Quit();
-
-#endif
     exit(0);
 }
-
-#if !defined(_WIN32) && !defined(__MACOSX__)
-#define ZENITY_BINARY "/usr/bin/zenity"
-
-// returns non-zero if zenity is available
-
-static int ZenityAvailable(void)
-{
-    return 0;
-    /*return system(ZENITY_BINARY " --help >/dev/null 2>&1") == 0;*/
-}
-
-// Escape special characters in the given string so that they can be
-// safely enclosed in shell quotes.
-
-static char *EscapeShellString(char *string)
-{
-    char *result;
-    char *r, *s;
-
-    // In the worst case, every character might be escaped.
-    result = malloc(strlen(string) * 2 + 3);
-    r = result;
-
-    // Enclosing quotes.
-    *r = '"';
-    ++r;
-
-    for (s = string; *s != '\0'; ++s)
-    {
-        // From the bash manual:
-        //
-        //  "Enclosing characters in double quotes preserves the literal
-        //   value of all characters within the quotes, with the exception
-        //   of $, `, \, and, when history expansion is enabled, !."
-        //
-        // Therefore, escape these characters by prefixing with a backslash.
-
-        if (strchr("$`\\!", *s) != NULL)
-        {
-            *r = '\\';
-            ++r;
-        }
-
-        *r = *s;
-        ++r;
-    }
-
-    // Enclosing quotes.
-    *r = '"';
-    ++r;
-    *r = '\0';
-
-    return result;
-}
-
-// Open a native error box with a message using zenity
-
-static int ZenityErrorBox(char *message)
-{
-    int result;
-    char *escaped_message;
-    char *errorboxpath;
-    static size_t errorboxpath_size;
-
-    if (!ZenityAvailable())
-    {
-        return 0;
-    }
-
-    escaped_message = EscapeShellString(message);
-
-    errorboxpath_size = strlen(ZENITY_BINARY) + strlen(escaped_message) + 19;
-    errorboxpath = malloc(errorboxpath_size);
-    M_snprintf(errorboxpath, errorboxpath_size, "%s --error --text=%s",
-               ZENITY_BINARY, escaped_message);
-
-    result = system(errorboxpath);
-
-    free(errorboxpath);
-    free(escaped_message);
-
-    return result;
-}
-
-#endif /* !defined(_WIN32) && !defined(__MACOSX__) */
-
 
 //
 // I_Error
@@ -369,16 +224,12 @@ void I_Error (char *error, ...)
 {
     char msgbuf[512];
     va_list argptr;
-    boolean exit_gui_popup;
+    boolean run_at_exit = true;
 
     if (already_quitting)
     {
         fprintf(stderr, "Warning: recursive call to I_Error detected.\n");
-#if ORIGCODE
-        exit(-1);
-#else
-        return;
-#endif
+        run_at_exit = false;
     }
     else
     {
@@ -400,67 +251,12 @@ void I_Error (char *error, ...)
 
     // Shutdown. Here might be other errors.
 
-    I_AtExitRun(true);
-
-    exit_gui_popup = !M_ParmExists("-nogui");
-
-    // Pop up a GUI dialog box to show the error message, if the
-    // game was not run from the console (and the user will
-    // therefore be unable to otherwise see the message).
-    if (exit_gui_popup && !I_ConsoleStdout())
-#ifdef _WIN32
+    if (run_at_exit)
     {
-        wchar_t wmsgbuf[512];
-
-        MultiByteToWideChar(CP_ACP, 0,
-                            msgbuf, strlen(msgbuf) + 1,
-                            wmsgbuf, sizeof(wmsgbuf));
-
-        MessageBoxW(NULL, wmsgbuf, L"", MB_OK);
+        I_AtExitRun(true);
     }
-#elif defined(__MACOSX__)
-    {
-        CFStringRef message;
-	int i;
 
-	// The CoreFoundation message box wraps text lines, so replace
-	// newline characters with spaces so that multiline messages
-	// are continuous.
-
-	for (i = 0; msgbuf[i] != '\0'; ++i)
-        {
-            if (msgbuf[i] == '\n')
-            {
-                msgbuf[i] = ' ';
-            }
-        }
-
-        message = CFStringCreateWithCString(NULL, msgbuf,
-                                            kCFStringEncodingUTF8);
-
-        CFUserNotificationDisplayNotice(0,
-                                        kCFUserNotificationCautionAlertLevel,
-                                        NULL,
-                                        NULL,
-                                        NULL,
-                                        CFSTR(PACKAGE_STRING),
-                                        message,
-                                        NULL);
-    }
-#else
-    {
-        ZenityErrorBox(msgbuf);
-    }
-#endif
-
-    // abort();
-#if ORIGCODE
-    SDL_Quit();
-
-    exit(-1);
-#else
-    exit(-1);
-#endif
+    exit(EXIT_FAILURE);
 }
 
 #ifdef __phoenix__
@@ -589,4 +385,3 @@ boolean I_GetMemoryValue(unsigned int offset, void *value, int size)
 
     return false;
 }
-

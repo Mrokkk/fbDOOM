@@ -22,7 +22,6 @@
 //
 //-----------------------------------------------------------------------------
 
-#include "config.h"
 #include "i_system.h"
 #include "i_video.h"
 #include "m_argv.h"
@@ -94,7 +93,7 @@ typedef struct
 
 static uint16_t rgb565_palette[256];
 
-void cmap_to_rgb565(uint16_t * out, uint8_t * in, int in_pixels)
+void I_CMapToRGB565(uint16_t * out, uint8_t * in, int in_pixels)
 {
     int i, j;
     struct color c;
@@ -115,13 +114,14 @@ void cmap_to_rgb565(uint16_t * out, uint8_t * in, int in_pixels)
     }
 }
 
-void cmap_to_fb(uint32_t * out, uint8_t * in, int in_pixels)
+void I_CMapToRGB888(uint32_t * out, uint8_t * in, int in_pixels)
 {
+    int i, j;
     struct color c;
     uint32_t pix;
     uint32_t r, g, b;
 
-    for (int i = 0; i < in_pixels; i++)
+    for (i = 0; i < in_pixels; i++)
     {
         c = colors[*in];  /* R:8 G:8 B:8 format! */
         r = (uint16_t)(c.r);
@@ -132,7 +132,7 @@ void cmap_to_fb(uint32_t * out, uint8_t * in, int in_pixels)
         pix |= b << 0;
         pix |= 0xff << 24;
 
-        for (int k = 0; k < fb_scaling; k++)
+        for (j = 0; j < fb_scaling; j++)
         {
             *out++ = pix;
         }
@@ -211,7 +211,7 @@ void I_InitGraphics (void)
         }
     }
 #else
-    (void)old_mode;
+    UNUSED(old_mode);
 #endif
 
     memset(I_VideoBuffer_FB, 0, fb_size);
@@ -244,15 +244,6 @@ void I_StartFrame (void)
 {
 }
 
-__attribute__ ((weak)) void I_GetEvent (void)
-{
-}
-
-__attribute__ ((weak)) void I_StartTic (void)
-{
-    I_GetEvent();
-}
-
 void I_UpdateNoBlit (void)
 {
 }
@@ -270,8 +261,8 @@ void I_FinishUpdate (void)
     /* 600 = fb heigt, 200 screenheight */
     /* 600 = fb heigt, 200 screenheight */
     /* 2048 =fb width, 320 screenwidth */
-    x_offset     = (((fb.xres - (SCREENWIDTH  * fb_scaling)) * fb.bits_per_pixel/8)) / 2; // XXX: siglent FB hack: /4 instead of /2, since it seems to handle the resolution in a funny way
-    x_offset_end = ((fb.xres - (SCREENWIDTH  * fb_scaling)) * fb.bits_per_pixel/8) - x_offset;
+    x_offset     = (((fb.xres - (SCREENWIDTH  * fb_scaling)) * fb.bits_per_pixel / 8)) / 2; // XXX: siglent FB hack: /4 instead of /2, since it seems to handle the resolution in a funny way
+    x_offset_end = ((fb.xres - (SCREENWIDTH  * fb_scaling)) * fb.bits_per_pixel / 8) - x_offset;
 
     /* DRAW SCREEN */
     line_in  = (unsigned char *) I_VideoBuffer;
@@ -282,17 +273,10 @@ void I_FinishUpdate (void)
     while (y--)
     {
         int i;
-        for (i = 0; i < fb_scaling; i++) {
+        for (i = 0; i < fb_scaling; i++)
+        {
             line_out += x_offset;
-#ifdef CMAP256
-            for (fb_scaling == 1) {
-                memcpy(line_out, line_in, SCREENWIDTH); /* fb_width is bigger than Doom SCREENWIDTH... */
-            } else {
-                //XXX FIXME fb_scaling support!
-            }
-#else
-            cmap_to_fb((void*)line_out, (void*)line_in, SCREENWIDTH);
-#endif
+            I_CMapToRGB888((uint32_t*)line_out, (uint8_t*)line_in, SCREENWIDTH);
             line_out += (SCREENWIDTH * fb_scaling * (fb.bits_per_pixel/8)) + x_offset_end;
         }
         line_in += SCREENWIDTH;
@@ -310,10 +294,10 @@ void I_ReadScreen (byte* scr)
 //
 // I_SetPalette
 //
-#define GFX_RGB565(r, g, b)			((((r & 0xF8) >> 3) << 11) | (((g & 0xFC) >> 2) << 5) | ((b & 0xF8) >> 3))
-#define GFX_RGB565_R(color)			((0xF800 & color) >> 11)
-#define GFX_RGB565_G(color)			((0x07E0 & color) >> 5)
-#define GFX_RGB565_B(color)			(0x001F & color)
+#define GFX_RGB565(r, g, b)     ((((r & 0xF8) >> 3) << 11) | (((g & 0xFC) >> 2) << 5) | ((b & 0xF8) >> 3))
+#define GFX_RGB565_R(color)     ((0xF800 & color) >> 11)
+#define GFX_RGB565_G(color)     ((0x07E0 & color) >> 5)
+#define GFX_RGB565_B(color)     (0x001F & color)
 
 void I_SetPalette (byte* palette)
 {
@@ -322,20 +306,18 @@ void I_SetPalette (byte* palette)
     /* performance boost:
      * map to the right pixel format over here! */
 
-    for (i=0; i<256; ++i ) {
+    for (i = 0; i < 256; ++i)
+    {
         colors[i].a = 0;
         colors[i].r = gammatable[usegamma][*palette++];
         colors[i].g = gammatable[usegamma][*palette++];
         colors[i].b = gammatable[usegamma][*palette++];
     }
-
-    /* Set new color map in kernel framebuffer driver */
-    //XXX FIXME ioctl(fd_fb, IOCTL_FB_PUTCMAP, colors);
 }
 
 // Given an RGB value, find the closest matching palette index.
 
-int I_GetPaletteIndex (int r, int g, int b)
+int I_GetPaletteIndex(int r, int g, int b)
 {
     int best, best_diff, diff;
     int i;
@@ -384,11 +366,6 @@ void I_SetWindowTitle (char *title)
 
 void I_GraphicsCheckCommandLine (void)
 {
-}
-
-void I_SetGrabMouseCallback (grabmouse_callback_t func)
-{
-    (void)func;
 }
 
 void I_EnableLoadingDisk(void)

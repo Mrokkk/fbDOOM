@@ -340,6 +340,7 @@ static void BlockUntilStart(net_gamesettings_t *settings,
 void D_StartNetGame(net_gamesettings_t *settings,
                     netgame_startup_callback_t callback)
 {
+    UNUSED(callback);
 #if ORIGCODE
     int i;
 
@@ -688,7 +689,7 @@ static void TicdupSquash(ticcmd_set_t *set)
 
 static void SinglePlayerClear(ticcmd_set_t *set)
 {
-    unsigned int i;
+    int i;
 
     for (i = 0; i < NET_MAXPLAYERS; ++i)
     {

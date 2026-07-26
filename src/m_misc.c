@@ -25,17 +25,8 @@
 #include <errno.h>
 #include <unistd.h>
 
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#include <io.h>
-#ifdef _MSC_VER
-#include <direct.h>
-#endif
-#else
 #include <sys/stat.h>
 #include <sys/types.h>
-#endif
 
 #include "doomtype.h"
 
@@ -55,11 +46,7 @@
 
 void M_MakeDirectory(char *path)
 {
-#ifdef _WIN32
-    mkdir(path);
-#else
     mkdir(path, 0755);
-#endif
 }
 
 // Check if a file exists
@@ -167,25 +154,7 @@ int M_ReadFile(char *name, byte **buffer)
 
 char *M_TempFile(char *s)
 {
-    char *tempdir;
-
-#ifdef _WIN32
-
-    // Check the TEMP environment variable to find the location.
-
-    tempdir = getenv("TEMP");
-
-    if (tempdir == NULL)
-    {
-        tempdir = ".";
-    }
-#else
-    // In Unix, just use /tmp.
-
-    tempdir = "/tmp";
-#endif
-
-    return M_StringJoin(tempdir, DIR_SEPARATOR_S, s, NULL);
+    return M_StringJoin("/tmp", DIR_SEPARATOR_S, s, NULL);
 }
 
 boolean M_StrToInt(const char *str, int *result)
@@ -472,13 +441,6 @@ char *M_StringJoin(const char *s, ...)
     return result;
 }
 
-// On Windows, vsnprintf() is _vsnprintf().
-#ifdef _WIN32
-#if _MSC_VER < 1400 /* not needed for Visual Studio 2008 */
-#define vsnprintf _vsnprintf
-#endif
-#endif
-
 // Safe, portable vsnprintf().
 int M_vsnprintf(char *buf, size_t buf_len, const char *s, va_list args)
 {
@@ -496,7 +458,7 @@ int M_vsnprintf(char *buf, size_t buf_len, const char *s, va_list args)
 
     // If truncated, change the final char in the buffer to a \0.
     // A negative result indicates a truncated buffer on Windows.
-    if (result < 0 || result >= buf_len)
+    if (result < 0 || (size_t)result >= buf_len)
     {
         buf[buf_len - 1] = '\0';
         result = buf_len - 1;
@@ -515,23 +477,3 @@ int M_snprintf(char *buf, size_t buf_len, const char *s, ...)
     va_end(args);
     return result;
 }
-
-#ifdef _WIN32
-
-char *M_OEMToUTF8(const char *oem)
-{
-    unsigned int len = strlen(oem) + 1;
-    wchar_t *tmp;
-    char *result;
-
-    tmp = malloc(len * sizeof(wchar_t));
-    MultiByteToWideChar(CP_OEMCP, 0, oem, len, tmp, len);
-    result = malloc(len * 4);
-    WideCharToMultiByte(CP_UTF8, 0, tmp, len, result, len * 4, NULL, NULL);
-    free(tmp);
-
-    return result;
-}
-
-#endif
-

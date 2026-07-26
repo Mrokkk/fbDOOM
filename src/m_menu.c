@@ -29,6 +29,7 @@
 #include "d_main.h"
 #include "deh_main.h"
 
+#include "i_input.h"
 #include "i_swap.h"
 #include "i_system.h"
 #include "i_timer.h"
@@ -1016,8 +1017,7 @@ void M_Options(int choice)
 //
 void M_ChangeMessages(int choice)
 {
-    // warning: unused parameter `int choice'
-    choice = 0;
+    UNUSED(choice);
     showMessages = 1 - showMessages;
 	
     if (!showMessages)
@@ -1044,7 +1044,7 @@ void M_EndGameResponse(int key)
 
 void M_EndGame(int choice)
 {
-    choice = 0;
+    UNUSED(choice);
     if (!usergame)
     {
 	S_StartSound(NULL,sfx_oof);
@@ -1068,12 +1068,14 @@ void M_EndGame(int choice)
 //
 void M_ReadThis(int choice)
 {
-    choice = 0;
+    UNUSED(choice);
     M_SetupNextMenu(&ReadDef1);
 }
 
 void M_ReadThis2(int choice)
 {
+    UNUSED(choice);
+
     // Doom 1.9 had two menus when playing Doom 1
     // All others had only one
 
@@ -1092,7 +1094,7 @@ void M_ReadThis2(int choice)
 
 void M_FinishReadThis(int choice)
 {
-    choice = 0;
+    UNUSED(choice);
     M_SetupNextMenu(&MainDef);
 }
 
@@ -1167,6 +1169,7 @@ static char *M_SelectEndMessage(void)
 
 void M_QuitDOOM(int choice)
 {
+    UNUSED(choice);
     DEH_snprintf(endstring, sizeof(endstring), "%s\n\n" DOSY,
                  DEH_String(M_SelectEndMessage()));
 
@@ -1196,7 +1199,7 @@ void M_ChangeSensitivity(int choice)
 
 void M_ChangeDetail(int choice)
 {
-    choice = 0;
+    UNUSED(choice);
     detailLevel = 1 - detailLevel;
 
     R_SetViewSize (screenblocks, detailLevel);

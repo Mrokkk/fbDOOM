@@ -21,25 +21,25 @@
 #define __R_LOCAL__
 
 // Binary Angles, sine/cosine/atan lookups.
-#include "tables.h"
+#include "tables.h" // IWYU pragma: export
 
 // Screen size related parameters.
-#include "doomdef.h"
+#include "doomdef.h" // IWYU pragma: export
 
 // Include the refresh/render data structs.
-#include "r_data.h"
+#include "r_data.h" // IWYU pragma: export
 
 
 
 //
 // Separate header file for each module.
 //
-#include "r_main.h"
-#include "r_bsp.h"
-#include "r_segs.h"
-#include "r_plane.h"
-#include "r_data.h"
-#include "r_things.h"
-#include "r_draw.h"
+#include "r_main.h" // IWYU pragma: export
+#include "r_bsp.h" // IWYU pragma: export
+#include "r_segs.h" // IWYU pragma: export
+#include "r_plane.h" // IWYU pragma: export
+#include "r_data.h" // IWYU pragma: export
+#include "r_things.h" // IWYU pragma: export
+#include "r_draw.h" // IWYU pragma: export
 
 #endif		// __R_LOCAL__

@@ -26,7 +26,6 @@
 
 #include "deh_main.h"
 #include "i_swap.h"
-#include "i_system.h"
 
 #include "w_wad.h"
 
@@ -408,6 +407,7 @@ void WI_slamBackground(void)
 //  because of timing issues in netgames.
 boolean WI_Responder(event_t* ev)
 {
+    UNUSED(ev);
     return false;
 }
 
@@ -1518,11 +1518,11 @@ void WI_Ticker(void)
 
     if (bcnt == 1)
     {
-	// intermission music
-  	if ( gamemode == commercial )
-	  S_ChangeMusic(mus_dm2int, true);
-	else
-	  S_ChangeMusic(mus_inter, true); 
+        // intermission music
+        if ( gamemode == commercial )
+            S_ChangeMusic(mus_dm2int, true);
+        else
+            S_ChangeMusic(mus_inter, true);
     }
 
     WI_checkForAccelerate();

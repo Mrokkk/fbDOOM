@@ -28,6 +28,7 @@
 #include "d_event.h"
 #include "doomkeys.h"
 #include "doomtype.h"
+#include "i_input.h"
 #include "i_system.h"
 #include "i_video.h"
 
@@ -376,7 +377,7 @@ static void I_UpdateShiftStatus(int pressed, unsigned char key)
     }
 }
 
-void I_GetEvent(void)
+static void I_GetEvent(void)
 {
     event_t event;
     int pressed;
@@ -433,6 +434,16 @@ void I_GetEvent(void)
     }
 }
 
+void I_StartTic(void)
+{
+    I_GetEvent();
+}
+
+void I_SetGrabMouseCallback(grabmouse_callback_t func)
+{
+    UNUSED(func);
+}
+
 void I_InitInput(void)
 {
     struct termios new_term;
@@ -474,7 +485,7 @@ void I_InitInput(void)
     /* If those didn't work, not all is lost. We can try the
        3 standard file descriptors, in hopes that one of them
        might point to a console. This is not especially likely. */
-    if (keyboard_files[i] == NULL)
+    if (!found)
     {
         for (kb = 0; kb < 3; kb++)
         {
@@ -488,9 +499,8 @@ void I_InitInput(void)
 
     if (!found)
     {
-        printf("Unable to find a file descriptor associated with "
-                "the keyboard.\n"
-                "Perhaps you're not using a virtual terminal?\n");
+        printf("Unable to find a file descriptor associated with the keyboard.\n"
+               "Perhaps you're not using a virtual terminal?\n");
         return;
     }
 
