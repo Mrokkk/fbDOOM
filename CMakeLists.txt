@@ -7,10 +7,21 @@ option(OPTIMIZE    "Enable compiler optimizations" ON)
 option(SANITIZE    "Enable ASan and UBsan"         OFF)
 option(PROFILE     "Enable profiling"              OFF)
 
+set(BACKEND "Unix" CACHE STRING "Used platform")
+
 message(STATUS "Enable Link Time Optimization: ${LTO}")
 message(STATUS "Enable compiler optimizations: ${OPTIMIZE}")
 message(STATUS "Enable ASan and UBsan:         ${SANITIZE}")
 message(STATUS "Enable profiling:              ${PROFILE}")
+message(STATUS "Platform:                      ${BACKEND}")
+
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+execute_process(
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+        ${CMAKE_BINARY_DIR}/compile_commands.json
+        ${CMAKE_SOURCE_DIR}/compile_commands.json
+)
 
 set(CMAKE_C_STANDARD 90)
 add_compile_options(-pipe -ggdb3 -Wall -Wextra -fdata-sections -ffunction-sections -Wno-unused-parameter)
@@ -32,6 +43,8 @@ endif()
 if(LTO)
     add_compile_options(-flto=auto)
 endif()
+
+include_directories(src)
 
 add_executable(doom
 
@@ -118,12 +131,59 @@ add_executable(doom
 
 )
 
+if(BACKEND STREQUAL "X11")
+
+    find_package(X11)
+
+    add_library(platform_x11 OBJECT src/platform/x11.c)
+    target_include_directories(platform_x11 PRIVATE ${X11_INCLUDE_DIR})
+    target_link_libraries(platform_x11 PUBLIC ${X11_LIBRARIES})
+
+    target_link_libraries(doom PRIVATE platform_x11)
+
+elseif(BACKEND STREQUAL "Raylib")
+
+    include(FetchContent)
+    set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
+
+    FetchContent_Declare(raylib
+        SYSTEM
+        GIT_REPOSITORY https://github.com/raysan5/raylib
+        GIT_TAG dbc56a87da87d973a9c5baa4e7438a9d20121d28 # tag: 6.0
+    )
+    FetchContent_MakeAvailable(raylib)
+
+    target_compile_definitions(raylib PUBLIC -DSUPPORT_SCREEN_CAPTURE=0)
+
+    target_compile_options(raylib PRIVATE -O3 -ggdb3)
+    target_compile_definitions(raylib PRIVATE
+        -DSUPPORT_MODULE_RSHAPES=0
+        -DSUPPORT_MODULE_RMODELS=0
+        -DSUPPORT_CAMERA_SYSTEM=0
+        -DSUPPORT_GESTURES_SYSTEM=0
+        -DSUPPORT_MOUSE_GESTURES=0
+        -DSUPPORT_MESH_GENERATION=0
+        -DSUPPORT_FILEFORMAT_OBJ=0
+        -DSUPPORT_FILEFORMAT_MTL=0
+        -DSUPPORT_FILEFORMAT_IQM=0
+        -DSUPPORT_FILEFORMAT_GLTF=0
+        -DSUPPORT_FILEFORMAT_VOX=0
+        -DSUPPORT_FILEFORMAT_M3D=0
+    )
+
+    add_library(platform_raylib OBJECT src/platform/raylib.c)
+    target_link_libraries(platform_raylib PRIVATE raylib)
+    target_compile_options(platform_raylib PRIVATE -std=c99)
+
+    target_link_libraries(doom PRIVATE platform_raylib)
+
+elseif(BACKEND STREQUAL "Unix")
+
+    add_library(platform_unix OBJECT src/platform/unix.c)
+    target_link_libraries(doom PRIVATE platform_unix)
+
+else()
+    message(FATAL_ERROR "Unrecognized platform: ${BACKEND}")
+endif()
+
 install(TARGETS doom)
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-
-execute_process(
-    COMMAND ${CMAKE_COMMAND} -E create_symlink
-        ${CMAKE_BINARY_DIR}/compile_commands.json
-        ${CMAKE_SOURCE_DIR}/compile_commands.json
-)

@@ -20,6 +20,8 @@
 #ifndef __I_SYSTEM__
 #define __I_SYSTEM__
 
+#include <stdio.h>
+
 #include "d_event.h"
 #include "d_ticcmd.h"
 #include "doomtype.h"
@@ -32,10 +34,9 @@ void I_Init (void);
 // Called by startup code
 // to get the ammount of memory to malloc
 // for the zone management.
-byte*	I_ZoneBase (int *size);
+byte* I_ZoneBase (int *size);
 
 boolean I_ConsoleStdout(void);
-
 
 // Asynchronous interrupt functions should maintain private queues
 // that are read by the synchronous functions
@@ -90,4 +91,3 @@ void I_PrintBanner(char *text);
 void I_PrintDivider(void);
 
 #endif
-

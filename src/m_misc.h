@@ -25,6 +25,9 @@
 
 #include "doomtype.h"
 
+#define MIN(a, b)   ({ a < b ? a : b; })
+#define MAX(a, b)   ({ a > b ? a : b; })
+
 boolean M_WriteFile(char *name, void *source, int length);
 int M_ReadFile(char *name, byte **buffer);
 void M_MakeDirectory(char *dir);

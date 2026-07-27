@@ -19,11 +19,11 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
-#include <sys/param.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
 #include "i_system.h"
+#include "m_misc.h"
 #include "w_file.h"
 #include "z_zone.h"
 

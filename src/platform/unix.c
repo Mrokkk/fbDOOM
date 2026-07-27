@@ -1,0 +1,596 @@
+/*
+ * Copyright(C) 1993-1996 Id Software, Inc.
+ * Copyright(C) 2005-2014 Simon Howard
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * DESCRIPTION:
+ *  DOOM graphics and input stuff using raw framebuffer, TTY and mouse
+ */
+
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/ioctl.h>
+#include <sys/mman.h>
+#include <termios.h>
+#include <unistd.h>
+
+#ifdef __linux__
+#include <linux/fb.h>
+#include <linux/kd.h>
+#endif
+
+#include "d_event.h"
+#include "doomkeys.h"
+#include "doomtype.h"
+#include "i_input.h"
+#include "i_system.h"
+#include "platform.h"
+
+static int fd_fb = -1;
+static int old_tty_mode = -1;
+static byte* screen_buffer;
+
+void I_Platform_InitGraphics(screen_t* s)
+{
+    size_t fb_size;
+    uint16_t bytes_per_pixel;
+    struct fb_var_screeninfo fb;
+
+    /* Open fbdev file descriptor */
+    fd_fb = open("/dev/fb0", O_RDWR);
+    if (fd_fb < 0)
+    {
+        I_Error("Could not open /dev/fb0: %s\n", strerror(errno));
+    }
+
+    /* fetch framebuffer info */
+    if (ioctl(fd_fb, FBIOGET_VSCREENINFO, &fb))
+    {
+        I_Error("Could not read framebuffer info: %s\n", strerror(errno));
+    }
+
+    bytes_per_pixel = (fb.bits_per_pixel + 7) / 8;
+    fb_size = fb.xres * fb.yres * bytes_per_pixel;
+
+    screen_buffer = mmap(NULL, fb_size, PROT_READ | PROT_WRITE, MAP_FILE | MAP_SHARED, fd_fb, 0);
+
+    if (screen_buffer == MAP_FAILED)
+    {
+        I_Error("Could not map /dev/fb0: %s\n", strerror(errno));
+    }
+
+#ifdef __phoenix__
+    if (ioctl(STDIN_FILENO, KDGETMODE, &old_tty_mode))
+    {
+        I_Error("Could not check mode: %s\n", strerror(errno));
+    }
+
+    if (old_tty_mode != KD_GRAPHICS)
+    {
+        if (ioctl(STDIN_FILENO, KDSETMODE, KD_GRAPHICS))
+        {
+            I_Error("Could not enable graphical mode: %s\n", strerror(errno));
+        }
+    }
+#else
+    UNUSED(old_tty_mode);
+#endif
+
+    memset(screen_buffer, 0, fb_size);
+
+    s->resx            = fb.xres;
+    s->resy            = fb.yres;
+    s->bits_per_pixel  = fb.bits_per_pixel;
+    s->bytes_per_pixel = bytes_per_pixel;
+    s->red.offset      = fb.red.offset;
+    s->red.len         = fb.red.length;
+    s->green.offset    = fb.green.offset;
+    s->green.len       = fb.green.length;
+    s->blue.offset     = fb.blue.offset;
+    s->blue.len        = fb.blue.length;
+    s->alpha.offset    = fb.transp.offset;
+    s->alpha.len       = fb.transp.length;
+    s->pixels          = screen_buffer;
+}
+
+void I_Platform_ShutdownGraphics(screen_t* s)
+{
+    if (screen_buffer)
+    {
+        munmap(screen_buffer, s->resx * s->resy * s->bytes_per_pixel);
+    }
+#ifdef __phoenix__
+    if (old_tty_mode != -1)
+    {
+        if (ioctl(STDIN_FILENO, KDSETMODE, old_tty_mode))
+        {
+            I_Error("Failed to restore old mode: %s\n", strerror(errno));
+        }
+    }
+#endif
+}
+
+void I_Platform_SetWindowTitle(char* title)
+{
+    UNUSED(title);
+}
+
+void I_Platform_RenderFrame(void)
+{
+}
+
+extern int usemouse;
+static int old_kb_mode = -1;
+static struct termios old_term;
+static int old_term_read = false;
+static int kb = -1; /* keyboard file descriptor */
+static int mouse = -1; /* mouse file descriptor */
+
+/* Is the shift key currently down? */
+static int shiftdown = 0;
+
+/* Lookup table for mapping AT keycodes to their doom keycode */
+static const char at_to_doom[] =
+{
+    /* 0x00 */ 0x00,
+    /* 0x01 */ KEY_ESCAPE,
+    /* 0x02 */ '1',
+    /* 0x03 */ '2',
+    /* 0x04 */ '3',
+    /* 0x05 */ '4',
+    /* 0x06 */ '5',
+    /* 0x07 */ '6',
+    /* 0x08 */ '7',
+    /* 0x09 */ '8',
+    /* 0x0a */ '9',
+    /* 0x0b */ '0',
+    /* 0x0c */ '-',
+    /* 0x0d */ '=',
+    /* 0x0e */ KEY_BACKSPACE,
+    /* 0x0f */ KEY_TAB,
+    /* 0x10 */ 'q',
+    /* 0x11 */ 'w',
+    /* 0x12 */ 'e',
+    /* 0x13 */ 'r',
+    /* 0x14 */ 't',
+    /* 0x15 */ 'y',
+    /* 0x16 */ 'u',
+    /* 0x17 */ 'i',
+    /* 0x18 */ 'o',
+    /* 0x19 */ 'p',
+    /* 0x1a */ '[',
+    /* 0x1b */ ']',
+    /* 0x1c */ KEY_ENTER,
+    /* 0x1d */ KEY_FIRE, /* KEY_RCTRL, */
+    /* 0x1e */ 'a',
+    /* 0x1f */ 's',
+    /* 0x20 */ 'd',
+    /* 0x21 */ 'f',
+    /* 0x22 */ 'g',
+    /* 0x23 */ 'h',
+    /* 0x24 */ 'j',
+    /* 0x25 */ 'k',
+    /* 0x26 */ 'l',
+    /* 0x27 */ ';',
+    /* 0x28 */ '\'',
+    /* 0x29 */ '`',
+    /* 0x2a */ KEY_RSHIFT,
+    /* 0x2b */ '\\',
+    /* 0x2c */ 'z',
+    /* 0x2d */ 'x',
+    /* 0x2e */ 'c',
+    /* 0x2f */ 'v',
+    /* 0x30 */ 'b',
+    /* 0x31 */ 'n',
+    /* 0x32 */ 'm',
+    /* 0x33 */ ',',
+    /* 0x34 */ '.',
+    /* 0x35 */ '/',
+    /* 0x36 */ KEY_RSHIFT,
+    /* 0x37 */ KEYP_MULTIPLY,
+    /* 0x38 */ KEY_LALT,
+    /* 0x39 */ KEY_USE,
+    /* 0x3a */ KEY_CAPSLOCK,
+    /* 0x3b */ KEY_F1,
+    /* 0x3c */ KEY_F2,
+    /* 0x3d */ KEY_F3,
+    /* 0x3e */ KEY_F4,
+    /* 0x3f */ KEY_F5,
+    /* 0x40 */ KEY_F6,
+    /* 0x41 */ KEY_F7,
+    /* 0x42 */ KEY_F8,
+    /* 0x43 */ KEY_F9,
+    /* 0x44 */ KEY_F10,
+    /* 0x45 */ KEY_NUMLOCK,
+    /* 0x46 */ 0x0,
+    /* 0x47 */ 0x0, /* 47 (Keypad-7/Home) */
+    /* 0x48 */ KEY_UPARROW, /* 48 (Keypad-8/Up) */
+    /* 0x49 */ 0x0, /* 49 (Keypad-9/PgUp) */
+    /* 0x4a */ 0x0, /* 4a (Keypad--) */
+    /* 0x4b */ KEY_LEFTARROW, /* 4b (Keypad-4/Left) */
+    /* 0x4c */ 0x0, /* 4c (Keypad-5) */
+    /* 0x4d */ KEY_RIGHTARROW, /* 4d (Keypad-6/Right) */
+    /* 0x4e */ 0x0, /* 4e (Keypad-+) */
+    /* 0x4f */ 0x0, /* 4f (Keypad-1/End) */
+    /* 0x50 */ KEY_DOWNARROW, /* 50 (Keypad-2/Down) */
+    /* 0x51 */ 0x0, /* 51 (Keypad-3/PgDn) */
+    /* 0x52 */ 0x0, /* 52 (Keypad-0/Ins) */
+    /* 0x53 */ 0x0, /* 53 (Keypad-./Del) */
+    /* 0x54 */ 0x0, /* 54 (Alt-SysRq) on a 84+ key keyboard */
+    /* 0x55 */ 0x0,
+    /* 0x56 */ 0x0,
+    /* 0x57 */ 0x0,
+    /* 0x58 */ 0x0,
+    /* 0x59 */ 0x0,
+    /* 0x5a */ 0x0,
+    /* 0x5b */ 0x0,
+    /* 0x5c */ 0x0,
+    /* 0x5d */ 0x0,
+    /* 0x5e */ 0x0,
+    /* 0x5f */ 0x0,
+    /* 0x60 */ 0x0,
+    /* 0x61 */ 0x0,
+    /* 0x62 */ 0x0,
+    /* 0x63 */ 0x0,
+    /* 0x64 */ 0x0,
+    /* 0x65 */ 0x0,
+    /* 0x66 */ 0x0,
+    /* 0x67 */ KEY_UPARROW,
+    /* 0x68 */ 0x0,
+    /* 0x69 */ KEY_LEFTARROW,
+    /* 0x6a */ KEY_RIGHTARROW,
+    /* 0x6b */ 0x0,
+    /* 0x6c */ KEY_DOWNARROW,
+    /* 0x6d */ 0x0,
+    /* 0x6e */ 0x0,
+    /* 0x6f */ 0x0,
+    /* 0x70 */ 0x0,
+    /* 0x71 */ 0x0,
+    /* 0x72 */ 0x0,
+    /* 0x73 */ 0x0,
+    /* 0x74 */ 0x0,
+    /* 0x75 */ 0x0,
+    /* 0x76 */ 0x0,
+    /* 0x77 */ 0x0,
+    /* 0x78 */ 0x0,
+    /* 0x79 */ 0x0,
+    /* 0x7a */ 0x0,
+    /* 0x7b */ 0x0,
+    /* 0x7c */ 0x0,
+    /* 0x7d */ 0x0,
+    /* 0x7e */ 0x0,
+    /* 0x7f */ KEY_FIRE, /* KEY_RCTRL, */
+};
+
+/*
+ * Lookup table for mapping ASCII characters to their equivalent when
+ * shift is pressed on an American layout keyboard:
+ */
+static const char shiftxform[] =
+{
+    0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+    11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+    21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+    31, ' ', '!', '"', '#', '$', '%', '&',
+    '"', // shift-'
+    '(', ')', '*', '+',
+    '<', // shift-,
+    '_', // shift--
+    '>', // shift-.
+    '?', // shift-/
+    ')', // shift-0
+    '!', // shift-1
+    '@', // shift-2
+    '#', // shift-3
+    '$', // shift-4
+    '%', // shift-5
+    '^', // shift-6
+    '&', // shift-7
+    '*', // shift-8
+    '(', // shift-9
+    ':',
+    ':', // shift-;
+    '<',
+    '+', // shift-=
+    '>', '?', '@',
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+    'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    '[', // shift-[
+    '!', // shift-backslash - OH MY GOD DOES WATCOM SUCK
+    ']', // shift-]
+    '"', '_',
+    '\'', // shift-`
+    'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N',
+    'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
+    '{', '|', '}', '~', 127
+};
+
+/* Checks whether or not the given file descriptor is associated
+   with a local keyboard.
+   Returns 1 if it is, 0 if not (or if something prevented us from
+   checking). */
+
+static int I_IsKeyboard(int fd)
+{
+    int data = 0;
+
+    if (ioctl(fd, KDGKBTYPE, &data) != 0)
+    {
+        return 0;
+    }
+
+    return data == KB_84 || data == KB_101;
+}
+
+void I_Platform_InitInput(void)
+{
+    struct termios new_term;
+    const char *keyboard_files[] = {"/dev/tty", "/dev/tty0", "/dev/console", NULL};
+    const char *mouse_files[] = {"/dev/mouse", NULL};
+    int i;
+    int found = 0;
+
+    /* First we need to find a file descriptor that represents the
+       system's keyboard. This should be /dev/tty, /dev/console,
+       stdin, stdout, or stderr. We'll try them in that order.
+       If none are acceptable, we're probably not being run
+       from a VT. */
+    for (i = 0; keyboard_files[i]; i++)
+    {
+        /* Try to open the file. */
+        kb = open(keyboard_files[i], O_RDONLY | O_NONBLOCK);
+        if (kb < 0) continue;
+        /* See if this is valid for our purposes. */
+        if (I_IsKeyboard(kb))
+        {
+            I_Printf("Using keyboard on %s\n", keyboard_files[i]);
+            found = 1;
+            break;
+        }
+        close(kb);
+    }
+
+    for (i = 0; mouse_files[i]; ++i)
+    {
+        mouse = open(mouse_files[i], O_RDONLY | O_NONBLOCK);
+        if (mouse > 0)
+        {
+            usemouse = 0;
+            break;
+        }
+    }
+
+    /* If those didn't work, not all is lost. We can try the
+       3 standard file descriptors, in hopes that one of them
+       might point to a console. This is not especially likely. */
+    if (!found)
+    {
+        for (kb = 0; kb < 3; kb++)
+        {
+            if (I_IsKeyboard(i))
+            {
+                found = 1;
+                break;
+            }
+        }
+    }
+
+    if (!found)
+    {
+        printf("Unable to find a file descriptor associated with the keyboard.\n"
+               "Perhaps you're not using a virtual terminal?\n");
+        return;
+    }
+
+    /* Find the keyboard's mode so we can restore it later. */
+    if (ioctl(kb, KDGKBMODE, &old_kb_mode) != 0)
+    {
+        I_Error("Unable to query keyboard mode: %s\n", strerror(errno));
+    }
+
+    /* Adjust the terminal's settings. In particular, disable
+       echoing, signal generation, and line buffering. Any of
+       these could cause trouble. Save the old settings first. */
+    if (tcgetattr(kb, &old_term) != 0)
+    {
+        I_Error("Unable to query terminal settings: %s\n", strerror(errno));
+    }
+
+    old_term_read = true;
+
+    new_term = old_term;
+    new_term.c_iflag = 0;
+    new_term.c_lflag &= ~(ECHO | ICANON | ISIG);
+
+    /* TCSAFLUSH discards unread input before making the change.
+       A good idea. */
+    if (tcsetattr(kb, TCSAFLUSH, &new_term) != 0)
+    {
+        I_Error("Unable to change terminal settings: %s\n", strerror(errno));
+    }
+
+    /* Put the keyboard in mediumraw mode. */
+    if (ioctl(kb, KDSKBMODE, K_MEDIUMRAW) != 0)
+    {
+        I_Error("Unable to set mediumraw mode: %s\n", strerror(errno));
+    }
+}
+
+static int I_KeyboardRead(int *pressed, unsigned char *key)
+{
+    uint8_t data;
+
+    if (read(kb, &data, 1) != 1)
+    {
+        return 0;
+    }
+
+    *pressed = (data & 0x80) == 0x80;
+    *key = data & 0x7F;
+
+    return 1;
+}
+
+static int I_MouseRead(char* buf)
+{
+    static char mouse_buf[3];
+    static size_t index;
+
+    int res = read(mouse, mouse_buf + index, 3 - index);
+
+    if (res < 0)
+    {
+        return 0;
+    }
+
+    index += res;
+
+    if (index == 3)
+    {
+        index = 0;
+        memcpy(buf, mouse_buf, 3);
+        return 1;
+    }
+
+    return 0;
+}
+
+static unsigned char I_TranslateKey(unsigned char key)
+{
+    return key < sizeof(at_to_doom)
+        ? at_to_doom[key]
+        : 0;
+}
+
+/* Get the equivalent ASCII (Unicode?) character for a keypress. */
+static unsigned char I_GetAsciiChar(unsigned char key)
+{
+    key = I_TranslateKey(key);
+
+    /* Is shift held down?  If so, perform a translation. */
+
+    if (shiftdown > 0)
+    {
+        if (key < arrlen(shiftxform))
+        {
+            key = shiftxform[key];
+        }
+        else
+        {
+            key = 0;
+        }
+    }
+
+    return key;
+}
+
+static void I_UpdateShiftStatus(int pressed, unsigned char key)
+{
+    int change;
+
+    if (pressed)
+    {
+        change = 1;
+    }
+    else
+    {
+        change = -1;
+    }
+
+    if (key == 0x2a || key == 0x36)
+    {
+        shiftdown += change;
+    }
+}
+
+void I_Platform_ShutdownInput(void)
+{
+    if (old_kb_mode != -1)
+    {
+        ioctl(kb, KDSKBMODE, old_kb_mode);
+    }
+    if (old_term_read)
+    {
+        tcsetattr(kb, 0, &old_term);
+    }
+    if (kb > 3)
+    {
+        close(kb);
+    }
+    if (mouse != -1)
+    {
+        close(mouse);
+    }
+}
+
+void I_Platform_ReadEvents(void)
+{
+    event_t event;
+    int pressed;
+    unsigned char key;
+    char mouse_buf[3];
+
+    /* put event-grabbing stuff in here */
+    while (I_KeyboardRead(&pressed, &key))
+    {
+        I_UpdateShiftStatus(pressed, key);
+
+        /* process event */
+        if (!pressed)
+        {
+            /*
+             * data1 has the key pressed, data2 has the character
+             * (shift-translated, etc)
+             */
+            event.type = ev_keydown;
+            event.data1 = I_TranslateKey(key);
+            event.data2 = I_GetAsciiChar(key);
+
+            if (event.data1 != 0)
+            {
+                D_PostEvent(&event);
+            }
+        }
+        else
+        {
+            event.type = ev_keyup;
+            event.data1 = I_TranslateKey(key);
+
+            /*
+             * data2 is just initialized to zero for ev_keyup.
+             * For ev_keydown it's the shifted Unicode character
+             * that was typed, but if something wants to detect
+             * key releases it should do so based on data1
+             * (key ID), not the printable char.
+             */
+
+            event.data2 = 0;
+
+            if (event.data1 != 0)
+            {
+                D_PostEvent(&event);
+            }
+        }
+    }
+
+    while (I_MouseRead(mouse_buf))
+    {
+        event.type = ev_mouse;
+        event.data1 = mouse_buf[0] & 7;
+        event.data2 = mouse_buf[1] * 5;
+        event.data3 = 0;
+
+        D_PostEvent(&event);
+    }
+}
