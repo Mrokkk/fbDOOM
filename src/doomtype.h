@@ -35,10 +35,12 @@
 #define PACKEDATTR  __attribute__((packed))
 #define NORETURN    __attribute__((noreturn))
 #define FALLTHROUGH __attribute__((fallthrough))
+#define WEAK        __attribute__((weak))
 #else
 #define PACKEDATTR
 #define NORETURN
 #define FALLTHROUGH
+#define WEAK
 #endif
 
 #define UNUSED(...) (void)(__VA_ARGS__)

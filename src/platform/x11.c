@@ -2,15 +2,19 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/ipc.h>
+#include <sys/shm.h>
 
 #include <X11/XKBlib.h>
 #include <X11/Xatom.h>
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
+#include <X11/extensions/XShm.h>
 
 #include "d_event.h"
 #include "doomkeys.h"
 #include "i_system.h"
+#include "m_argv.h"
 #include "platform/pixel_format.h"
 #include "platform/platform.h"
 
@@ -20,22 +24,25 @@ static Atom wm_delete_window;
 static GC gc;
 static uint32_t* screen_buffer;
 static XImage* image = NULL;
-Cursor empty_cursor;
+static Cursor empty_cursor;
+static boolean use_shm = false;
+static XShmSegmentInfo shminfo;
 
 static void I_Platform_SetupMouse(void)
 {
-    char data[1];
+    char data = 0;
     XColor color;
     Pixmap pixmap;
 
-    data[0] = 0;
     color.red = color.green = color.blue = 0;
-    pixmap = XCreateBitmapFromData(display, DefaultRootWindow(display), data, 1, 1);
+    pixmap = XCreateBitmapFromData(display, DefaultRootWindow(display), &data, 1, 1);
+
     if (pixmap)
     {
         empty_cursor = XCreatePixmapCursor(display, pixmap, pixmap, &color, &color, 0, 0);
         XFreePixmap(display, pixmap);
     }
+
     XDefineCursor(display, window, empty_cursor);
 }
 
@@ -50,6 +57,57 @@ static void I_Platform_WaitForMapNotify(void)
         {
             break;
         }
+    }
+}
+
+static void I_Platform_SetupXShm(Visual* visual, XWindowAttributes* attr)
+{
+    image = XShmCreateImage(display, visual, attr->depth, ZPixmap, 0, &shminfo, attr->width, attr->height);
+
+    if (!image)
+    {
+        I_Error("Failed to create XImage\n");
+    }
+
+    shminfo.shmid = shmget(IPC_PRIVATE, image->bytes_per_line * image->height, IPC_CREAT | 0777);
+
+    if (shminfo.shmid == -1)
+    {
+        I_Error("Failed to get shared memory\n");
+    }
+
+    shminfo.shmaddr = image->data = shmat(shminfo.shmid, 0, 0);
+    shminfo.readOnly = False;
+
+    if (!shminfo.shmaddr)
+    {
+        I_Error("Failed to get shared memory\n");
+    }
+
+    if (!XShmAttach(display, &shminfo))
+    {
+        I_Error("Failed to attach shared memory to X\n");
+    }
+
+    screen_buffer = (uint32_t*)shminfo.shmaddr;
+
+    I_Printf("Using X shared memory\n");
+}
+
+static void I_Platform_SetupXStandard(Visual* visual, XWindowAttributes* attr)
+{
+    screen_buffer = calloc(attr->width * attr->height, sizeof(uint32_t));
+
+    if (!screen_buffer)
+    {
+        I_Error("Failed to allocate screen buffer\n");
+    }
+
+    image = XCreateImage(display, visual, attr->depth, ZPixmap, 0, (char*)screen_buffer, attr->width, attr->height, 32, 0);
+
+    if (!image)
+    {
+        I_Error("Failed to create XImage\n");
     }
 }
 
@@ -101,9 +159,18 @@ void I_Platform_InitGraphics(screen_t* s)
 
     I_Platform_SetupMouse();
 
-    screen_buffer = calloc(attr.width * attr.height, sizeof(uint32_t));
+    if (!M_CheckParm("-noshm") && XShmQueryExtension(display))
+    {
+        I_Platform_SetupXShm(visual, &attr);
+        use_shm = true;
+    }
+    else
+    {
+        I_Platform_SetupXStandard(visual, &attr);
+        use_shm = false;
+    }
 
-    image = XCreateImage(display, visual, attr.depth, ZPixmap, 0, (char*)screen_buffer, attr.width, attr.height, 32, 0);
+    XSync(display, False);
 
     s->resx   = attr.width;
     s->resy   = attr.height;
@@ -120,6 +187,16 @@ void I_Platform_ShutdownGraphics(screen_t* s)
         XUndefineCursor(display, window);
         XFreeCursor(display, empty_cursor);
     }
+    if (shminfo.shmaddr)
+    {
+        XShmDetach(display, &shminfo);
+        shmdt(shminfo.shmaddr);
+        shmctl(shminfo.shmid, IPC_RMID, 0);
+    }
+    else if (screen_buffer)
+    {
+        free(screen_buffer);
+    }
     if (window)
     {
         XDestroyWindow(display, window);
@@ -127,10 +204,6 @@ void I_Platform_ShutdownGraphics(screen_t* s)
     if (display)
     {
         XCloseDisplay(display);
-    }
-    if (screen_buffer)
-    {
-        free(screen_buffer);
     }
 }
 
@@ -148,7 +221,24 @@ void I_Platform_SetWindowTitle(char* title)
 
 void I_Platform_RenderFrame(void)
 {
-    XPutImage(display, window, gc, image, 0, 0, 0, 0, image->width, image->height);
+    if (use_shm)
+    {
+        XShmPutImage(display, window, gc, image, 0, 0, 0, 0, image->width, image->height, True);
+        XSync(display, False);
+    }
+    else
+    {
+        XPutImage(display, window, gc, image, 0, 0, 0, 0, image->width, image->height);
+    }
+}
+
+void I_UpdateNoBlit(void)
+{
+    if (use_shm)
+    {
+        XShmPutImage(display, window, gc, image, 0, 0, 0, 0, image->width, image->height, True);
+        XSync(display, False);
+    }
 }
 
 void I_Platform_InitInput(void)

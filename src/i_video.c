@@ -227,15 +227,15 @@ void I_ShutdownGraphics(void)
     }
 }
 
-void I_StartFrame(void)
+WEAK void I_StartFrame(void)
 {
 }
 
-void I_UpdateNoBlit(void)
+WEAK void I_UpdateNoBlit(void)
 {
 }
 
-void I_FinishUpdate(void)
+WEAK void I_FinishUpdate(void)
 {
     I_DrawScreen();
     I_Platform_RenderFrame();
@@ -269,7 +269,7 @@ void I_SetPalette(byte* palette)
     uint8_t alpha_len = screen.alpha.len;
     uint8_t alpha_mask = MASK(alpha_len);
 
-#define COLOR_SET(c) \
+#define COLOR(c) \
     (((c) >> (8 - c##_len) & c##_mask) << c##_offset)
 
     for (i = 0; i < 256; ++i)
@@ -281,20 +281,20 @@ void I_SetPalette(byte* palette)
         switch (screen.bytes_per_pixel)
         {
             case 4:
-                color_table.width4[i] = COLOR_SET(red) | COLOR_SET(green) | COLOR_SET(blue);
+                color_table.width4[i] = COLOR(red) | COLOR(green) | COLOR(blue);
                 if (alpha_len)
                 {
-                    color_table.width4[i] |= COLOR_SET(alpha);
+                    color_table.width4[i] |= COLOR(alpha);
                 }
                 break;
             case 3:
-                color_table.width3[i] = COLOR_SET(red) | COLOR_SET(green) | COLOR_SET(blue);
+                color_table.width3[i] = COLOR(red) | COLOR(green) | COLOR(blue);
                 break;
             case 2:
-                color_table.width2[i] = COLOR_SET(red) | COLOR_SET(green) | COLOR_SET(blue);
+                color_table.width2[i] = COLOR(red) | COLOR(green) | COLOR(blue);
                 break;
             case 1:
-                color_table.width1[i] = COLOR_SET(red) | COLOR_SET(green) | COLOR_SET(blue);
+                color_table.width1[i] = COLOR(red) | COLOR(green) | COLOR(blue);
                 break;
             default:
                 return;
