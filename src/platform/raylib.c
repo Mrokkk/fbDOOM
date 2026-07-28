@@ -1,12 +1,14 @@
-#define __DOOMKEYS__
 #include <ctype.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <raylib.h>
 
+#define __DOOMKEYS__
 #include "d_event.h"
 #include "doomtype.h"
+#include "i_system.h"
 #include "i_video.h"
 #include "m_argv.h"
 #include "m_misc.h"
@@ -14,27 +16,46 @@
 #include "platform/platform.h"
 #include "platform/rl_doomkeys.h"
 
-static boolean show_fps;
+static boolean showfps;
 static Image screen_image;
 static Texture2D screen_texture;
 static int resx, resy;
 
 void I_Platform_InitGraphics(screen_t* s)
 {
+    int i, fps = 60;
+
     SetConfigFlags(FLAG_WINDOW_MAXIMIZED | FLAG_WINDOW_RESIZABLE);
-    SetTargetFPS(60);
     InitWindow(1024, 768, "fbdoom");
     SetWindowState(FLAG_WINDOW_MAXIMIZED | FLAG_WINDOW_RESIZABLE);
     SetExitKey(KEY_NULL);
 
-    show_fps = !!M_CheckParm("-fps");
+    showfps = !!M_CheckParm("-showfps");
+
+    i = M_CheckParmWithArgs("-fps", 1);
+    if (i > 0)
+    {
+        i = atoi(myargv[i + 1]);
+        if (i < 0)
+        {
+            I_Printf("Incorrect FPS setting: %d\n", i);
+        }
+        else
+        {
+            fps = i;
+        }
+    }
+
+    I_Printf("Target FPS: %d\n", fps);
+
+    SetTargetFPS(fps);
 
     screen_image = GenImageColor(SCREENWIDTH, SCREENHEIGHT, BLACK);
     screen_texture = LoadTextureFromImage(screen_image);
 
-    s->resx            = SCREENWIDTH;
-    s->resy            = SCREENHEIGHT;
-    s->pixels          = screen_image.data;
+    s->resx   = SCREENWIDTH;
+    s->resy   = SCREENHEIGHT;
+    s->pixels = screen_image.data;
 
     SET_PIXEL_FORMAT_R8B8G8A8(s);
 }
@@ -70,7 +91,7 @@ void I_Platform_RenderFrame(void)
 
         DrawTextureEx(screen_texture, (Vector2){posx, posy}, 0.0f, scale, WHITE);
 
-        if (show_fps)
+        if (showfps)
         {
             DrawFPS(resx - 100, 20);
         }

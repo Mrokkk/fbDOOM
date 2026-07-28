@@ -22,6 +22,7 @@
 #include "i_system.h"
 #include "i_video.h"
 #include "m_argv.h"
+#include "m_misc.h"
 #include "tables.h"
 #include "z_zone.h"
 
@@ -53,178 +54,159 @@ typedef union color_table
     uint32_t width4[256];
 } color_table_t;
 
-typedef struct
-{
-    byte r;
-    byte g;
-    byte b;
-} col_t;
-
 static color_table_t color_table;
 
-static uint16_t rgb565_palette[256];
-
-static void I_CMapTo2Bytes(uint16_t *out, uint8_t *in, int in_pixels)
-{
-    int i, j;
-    uint16_t c;
-
-    for (i = 0; i < in_pixels; i++)
-    {
-        c = color_table.width2[*in];
-
-        for (j = 0; j < fb_scaling; j++)
-        {
-            *out++ = c;
-        }
-
-        in++;
+#define DEFINE_DRAWSCREEN_SOFTWARESCALING(name, type, table, ...) \
+    static void I_CMapTo_##table(type *out, uint8_t *in, int in_pixels) \
+    { \
+        int i, j; \
+        uint32_t color; \
+        for (i = 0; i < in_pixels; i++) \
+        { \
+            color = color_table.table[*in]; \
+            for (j = 0; j < fb_scaling; j++) \
+            { \
+                __VA_ARGS__; \
+            } \
+            in++; \
+        } \
+    } \
+    static void name(void) \
+    { \
+        int i; \
+        int y; \
+        uint8_t *line_in, *line_out; \
+        line_in  = (uint8_t*)I_VideoBuffer; \
+        line_out = (uint8_t*)screen.pixels + y_offset_bytes; \
+        y = SCREENHEIGHT; \
+        while (y--) \
+        { \
+            for (i = 0; i < fb_scaling; i++) \
+            { \
+                line_out += left_x_offset; \
+                I_CMapTo_##table((type*)line_out, line_in, SCREENWIDTH); \
+                line_out += SCREENWIDTH * fb_scaling * screen.bytes_per_pixel + right_x_offset; \
+            } \
+            line_in += SCREENWIDTH; \
+        } \
     }
-}
 
-static void I_CMapTo3Bytes(uint8_t *out, uint8_t *in, int in_pixels)
-{
-    int i, j;
-    uint32_t color;
-
-    for (i = 0; i < in_pixels; i++)
-    {
-        color = color_table.width3[*in];
-        for (j = 0; j < fb_scaling; j++)
-        {
-            memcpy(out, &color, 3);
-            out += 3;
-        }
-        in++;
+#define DEFINE_DRAWSCREEN_NOSCALING(name, type, table, ...) \
+    static void I_CMapTo_##table##_NoScaling(type *out, uint8_t *in, int in_pixels) \
+    { \
+        int i; \
+        uint32_t color; \
+        for (i = 0; i < in_pixels; i++) \
+        { \
+            color = color_table.table[*in]; \
+            __VA_ARGS__; \
+            in++; \
+        } \
+    } \
+    static void name(void) \
+    { \
+        int y; \
+        uint8_t *line_in, *line_out; \
+        line_in  = (uint8_t*)I_VideoBuffer; \
+        line_out = (uint8_t*)screen.pixels + y_offset_bytes; \
+        y = SCREENHEIGHT; \
+        while (y--) \
+        { \
+            line_out += left_x_offset; \
+            I_CMapTo_##table##_NoScaling((type*)line_out, line_in, SCREENWIDTH); \
+            line_out += SCREENWIDTH * screen.bytes_per_pixel + right_x_offset; \
+            line_in += SCREENWIDTH; \
+        } \
     }
-}
 
-static void I_CMapTo4Bytes(uint32_t *out, uint8_t *in, int in_pixels)
-{
-    int i, j;
-    uint32_t color;
+DEFINE_DRAWSCREEN_SOFTWARESCALING(I_DrawScreen_4Bytes_SoftwareScaling, uint32_t, width4, *out++ = color);
+DEFINE_DRAWSCREEN_SOFTWARESCALING(I_DrawScreen_3Bytes_SoftwareScaling, uint8_t,  width3,  memcpy(out, &color, 3); out += 3);
+DEFINE_DRAWSCREEN_SOFTWARESCALING(I_DrawScreen_2Bytes_SoftwareScaling, uint16_t, width2, *out++ = color);
+DEFINE_DRAWSCREEN_SOFTWARESCALING(I_DrawScreen_1Bytes_SoftwareScaling, uint8_t,  width1, *out++ = color);
 
-    for (i = 0; i < in_pixels; i++)
-    {
-        color = color_table.width4[*in];
-        for (j = 0; j < fb_scaling; j++)
-        {
-            *out++ = color;
-        }
-        in++;
-    }
-}
-
-static void I_DrawScreen_4Bytes_SoftwareScaling(void)
-{
-    int i;
-    int y;
-    uint8_t *line_in, *line_out;
-
-    line_in  = (uint8_t*)I_VideoBuffer;
-    line_out = (uint8_t*)screen.pixels + y_offset_bytes;
-
-    y = SCREENHEIGHT;
-
-    while (y--)
-    {
-        for (i = 0; i < fb_scaling; i++)
-        {
-            line_out += left_x_offset;
-            I_CMapTo4Bytes((uint32_t*)line_out, line_in, SCREENWIDTH);
-            line_out += SCREENWIDTH * fb_scaling * screen.bytes_per_pixel + right_x_offset;
-        }
-        line_in += SCREENWIDTH;
-    }
-}
-
-static void I_DrawScreen_3Bytes_SoftwareScaling(void)
-{
-    int i;
-    int y;
-    uint8_t *line_in, *line_out;
-
-    line_in  = (uint8_t*)I_VideoBuffer;
-    line_out = (uint8_t*)screen.pixels + y_offset_bytes;
-
-    y = SCREENHEIGHT;
-
-    while (y--)
-    {
-        for (i = 0; i < fb_scaling; i++)
-        {
-            line_out += left_x_offset;
-            I_CMapTo3Bytes((uint8_t*)line_out, line_in, SCREENWIDTH);
-            line_out += SCREENWIDTH * fb_scaling * screen.bytes_per_pixel + right_x_offset;
-        }
-        line_in += SCREENWIDTH;
-    }
-}
-
-static void I_DrawScreen_2Bytes_SoftwareScaling(void)
-{
-    int i;
-    int y;
-    uint8_t *line_in, *line_out;
-
-    line_in  = (uint8_t*)I_VideoBuffer;
-    line_out = (uint8_t*)screen.pixels + y_offset_bytes;
-
-    y = SCREENHEIGHT;
-
-    while (y--)
-    {
-        for (i = 0; i < fb_scaling; i++)
-        {
-            line_out += left_x_offset;
-            I_CMapTo2Bytes((uint16_t*)line_out, line_in, SCREENWIDTH);
-            line_out += SCREENWIDTH * fb_scaling * screen.bytes_per_pixel + right_x_offset;
-        }
-        line_in += SCREENWIDTH;
-    }
-}
+DEFINE_DRAWSCREEN_NOSCALING(I_DrawScreen_4Bytes_NoScaling, uint32_t, width4, *out++ = color);
+DEFINE_DRAWSCREEN_NOSCALING(I_DrawScreen_3Bytes_NoScaling, uint8_t,  width3,  memcpy(out, &color, 3); out += 3);
+DEFINE_DRAWSCREEN_NOSCALING(I_DrawScreen_2Bytes_NoScaling, uint16_t, width2, *out++ = color);
+DEFINE_DRAWSCREEN_NOSCALING(I_DrawScreen_1Bytes_NoScaling, uint8_t,  width1, *out++ = color);
 
 void I_InitGraphics(void)
 {
-    int i;
+    int i, max_scaling;
 
     I_AtExit(I_ShutdownGraphics, true);
 
     I_Platform_InitGraphics(&screen);
 
-    switch (screen.bytes_per_pixel)
+    if (!screen.red.len && !screen.green.len && !screen.blue.len)
     {
-        case 4:
-            I_DrawScreen = &I_DrawScreen_4Bytes_SoftwareScaling;
-            break;
-        case 3:
-            I_DrawScreen = &I_DrawScreen_3Bytes_SoftwareScaling;
-            break;
-        case 2:
-            I_DrawScreen = &I_DrawScreen_2Bytes_SoftwareScaling;
-            break;
-        default:
-            I_Error("Unsupported screen depth: %u\n", screen.bits_per_pixel);
+        I_Error("Unusable platform screen: invalid colors bit lenghts\n");
     }
 
     I_Printf("DOOM screen size: %d x %d\n", SCREENWIDTH, SCREENHEIGHT);
     I_Printf("Platform screen: %d x %d x %d\n", screen.resx, screen.resy, screen.bits_per_pixel);
 
+    max_scaling = MIN(screen.resx / SCREENWIDTH, screen.resy / SCREENHEIGHT);
+
     i = M_CheckParmWithArgs("-scaling", 1);
     if (i > 0)
     {
         i = atoi(myargv[i + 1]);
-        fb_scaling = i;
-        I_Printf("Scaling factor: %d\n", fb_scaling);
+        if (i > max_scaling)
+        {
+            fb_scaling = max_scaling;
+            I_Printf("Scaling too big: %d, using max value %d\n", i, max_scaling);
+        }
+        else
+        {
+            fb_scaling = i;
+            I_Printf("Scaling factor: %d\n", fb_scaling);
+        }
     }
     else
     {
-        fb_scaling = screen.resx / SCREENWIDTH;
-        if (screen.resy / SCREENHEIGHT < fb_scaling)
-        {
-            fb_scaling = screen.resy / SCREENHEIGHT;
-        }
+        fb_scaling = max_scaling;
         I_Printf("Auto-scaling factor: %d\n", fb_scaling);
+    }
+
+    if (fb_scaling == 1)
+    {
+        switch (screen.bytes_per_pixel)
+        {
+            case 4:
+                I_DrawScreen = &I_DrawScreen_4Bytes_NoScaling;
+                break;
+            case 3:
+                I_DrawScreen = &I_DrawScreen_3Bytes_NoScaling;
+                break;
+            case 2:
+                I_DrawScreen = &I_DrawScreen_2Bytes_NoScaling;
+                break;
+            case 1:
+                I_DrawScreen = &I_DrawScreen_1Bytes_NoScaling;
+                break;
+            default:
+                I_Error("Unsupported screen depth: %u\n", screen.bits_per_pixel);
+        }
+    }
+    else
+    {
+        switch (screen.bytes_per_pixel)
+        {
+            case 4:
+                I_DrawScreen = &I_DrawScreen_4Bytes_SoftwareScaling;
+                break;
+            case 3:
+                I_DrawScreen = &I_DrawScreen_3Bytes_SoftwareScaling;
+                break;
+            case 2:
+                I_DrawScreen = &I_DrawScreen_2Bytes_SoftwareScaling;
+                break;
+            case 1:
+                I_DrawScreen = &I_DrawScreen_1Bytes_SoftwareScaling;
+                break;
+            default:
+                I_Error("Unsupported screen depth: %u\n", screen.bits_per_pixel);
+        }
     }
 
     left_x_offset   = ((screen.resx - (SCREENWIDTH  * fb_scaling))  * screen.bytes_per_pixel) / 2;
@@ -311,6 +293,9 @@ void I_SetPalette(byte* palette)
             case 2:
                 color_table.width2[i] = COLOR_SET(red) | COLOR_SET(green) | COLOR_SET(blue);
                 break;
+            case 1:
+                color_table.width1[i] = COLOR_SET(red) | COLOR_SET(green) | COLOR_SET(blue);
+                break;
             default:
                 return;
         }
@@ -325,6 +310,17 @@ void I_SetPalette(byte* palette)
 /* Given an RGB value, find the closest matching palette index. */
 int I_GetPaletteIndex(int r, int g, int b)
 {
+#if 0
+    typedef struct
+    {
+        byte r;
+        byte g;
+        byte b;
+    } col_t;
+
+    // FIXME: empty
+    static uint16_t rgb565_palette[256];
+
     int best, best_diff, diff;
     int i;
     col_t color;
@@ -353,10 +349,11 @@ int I_GetPaletteIndex(int r, int g, int b)
             break;
         }
     }
-
-    I_Printf("returning %d\n", best);
-
     return best;
+#else
+    UNUSED(r && g && b);
+    return 0;
+#endif
 }
 
 void I_BeginRead(void)

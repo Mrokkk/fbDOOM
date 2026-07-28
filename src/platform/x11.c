@@ -103,9 +103,9 @@ void I_Platform_InitGraphics(screen_t* s)
 
     image = XCreateImage(display, visual, attr.depth, ZPixmap, 0, (char*)screen_buffer, attr.width, attr.height, 32, 0);
 
-    s->resx            = attr.width;
-    s->resy            = attr.height;
-    s->pixels          = screen_buffer;
+    s->resx   = attr.width;
+    s->resy   = attr.height;
+    s->pixels = screen_buffer;
 
     SET_PIXEL_FORMAT_G8B8R8A8(s);
 }
