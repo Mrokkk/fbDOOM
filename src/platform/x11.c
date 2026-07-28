@@ -139,7 +139,7 @@ void I_Platform_InitGraphics(screen_t* s)
         I_Error("Failed to create window\n");
     }
 
-    XSelectInput(display, window, StructureNotifyMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask);
+    XSelectInput(display, window, StructureNotifyMask | KeyPressMask | KeyReleaseMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask);
 
     XMapWindow(display, window);
 
@@ -287,6 +287,8 @@ static uint8_t I_Platform_ConvertToDoomKey(unsigned int key)
     }
 }
 
+static int mouse_button;
+
 void I_Platform_ReadEvents(void)
 {
     XEvent e;
@@ -325,7 +327,7 @@ void I_Platform_ReadEvents(void)
 
             case ButtonPress:
                 event.type = ev_mouse;
-                event.data1 = e.xbutton.button;
+                event.data1 = mouse_button = e.xbutton.button;
                 event.data2 = 0;
                 event.data3 = 0;
                 D_PostEvent(&event);
@@ -333,11 +335,21 @@ void I_Platform_ReadEvents(void)
 
             case ButtonRelease:
                 event.type = ev_mouse;
-                event.data1 = 0;
+                event.data1 = mouse_button = 0;
                 event.data2 = 0;
+                event.data3 = 0;
+                D_PostEvent(&event);
+                break;
+
+            case MotionNotify:
+                event.type = ev_mouse;
+                event.data1 = mouse_button;
+                event.data2 = (e.xmotion.x - image->width / 2) * 3;
                 event.data3 = 0;
                 D_PostEvent(&event);
                 break;
         }
     }
+
+    XWarpPointer(display, None, window, 0, 0, 0, 0, image->width / 2, image->height / 2);
 }
