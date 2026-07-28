@@ -55,7 +55,7 @@ static void I_Platform_WaitForMapNotify(void)
 
 void I_Platform_InitGraphics(screen_t* s)
 {
-    int                 screen;
+    int                 screen, tmp;
     Window              root;
     Visual             *visual;
     XWindowAttributes   attr;
@@ -91,6 +91,8 @@ void I_Platform_InitGraphics(screen_t* s)
     gc = XCreateGC(display, window, 0, NULL);
 
     I_Platform_WaitForMapNotify();
+
+    XkbSetDetectableAutoRepeat(display, true, &tmp);
 
     screen = DefaultScreen(display);
     visual = DefaultVisual(display, screen);
