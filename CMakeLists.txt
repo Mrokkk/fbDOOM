@@ -25,7 +25,12 @@ execute_process(
 
 set(CMAKE_C_STANDARD 90)
 add_compile_options(-pipe -ggdb3 -Wall -Wextra -fdata-sections -ffunction-sections -Wno-unused-parameter)
-add_link_options(-Wl,--gc-sections)
+
+if(CMAKE_C_COMPILER_ID STREQUAL "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    add_link_options(-Wl,--gc-sections)
+elseif(CMAKE_C_COMPILER_ID STREQUAL "TinyCC")
+    add_link_options(-Wl,-lm)
+endif()
 
 if(PROFILE)
     add_compile_options(-fno-omit-frame-pointer)
