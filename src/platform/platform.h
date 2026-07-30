@@ -35,4 +35,10 @@ void I_Platform_InitInput(void);
 void I_Platform_ShutdownInput(void);
 void I_Platform_ReadEvents(void);
 
-#endif //  __PLATFORM_PLATFORM_H__
+struct music_module;
+struct sound_module;
+
+struct music_module* I_Platform_GetMusicModule(void);
+struct sound_module* I_Platform_GetSoundModule(void);
+
+#endif /*  __PLATFORM_PLATFORM_H__ */

@@ -33,6 +33,7 @@
 #include "i_video.h"
 #include "m_argv.h"
 #include "m_config.h"
+#include "platform/platform.h"
 
 // Sound sample rate to use for digital output (Hz)
 
@@ -60,17 +61,7 @@ static music_module_t *music_module;
 int snd_musicdevice = SNDDEVICE_SB;
 int snd_sfxdevice = SNDDEVICE_SB;
 
-// Sound modules
-
 extern void I_InitTimidityConfig(void);
-extern sound_module_t sound_sdl_module;
-extern sound_module_t sound_pcsound_module;
-extern music_module_t music_sdl_module;
-extern music_module_t music_opl_module;
-
-// For OPL module:
-
-extern int opl_io_port;
 
 // For native music module:
 
@@ -86,28 +77,6 @@ static int snd_sbirq = 0;
 static int snd_sbdma = 0;
 static int snd_mport = 0;
 #endif
-
-// Compiled-in sound modules:
-
-static sound_module_t *sound_modules[] = 
-{
-#ifdef FEATURE_SOUND
-    &sound_sdl_module,
-    &sound_pcsound_module,
-#endif
-    NULL,
-};
-
-// Compiled-in music modules:
-
-static music_module_t *music_modules[] =
-{
-#ifdef FEATURE_SOUND
-    &music_sdl_module,
-    &music_opl_module,
-#endif
-    NULL,
-};
 
 // Check if a sound device is in the given list of devices
 
@@ -132,27 +101,13 @@ static boolean SndDeviceInList(snddevice_t device, snddevice_t *list,
 
 static void InitSfxModule(boolean use_sfx_prefix)
 {
-    int i;
+    sound_module_t* tmp;
 
-    sound_module = NULL;
+    tmp = I_Platform_GetSoundModule();
 
-    for (i=0; sound_modules[i] != NULL; ++i)
+    if (tmp && tmp->Init(use_sfx_prefix))
     {
-        // Is the sfx device in the list of devices supported by
-        // this module?
-
-        if (SndDeviceInList(snd_sfxdevice, 
-                            sound_modules[i]->sound_devices,
-                            sound_modules[i]->num_sound_devices))
-        {
-            // Initialize the module
-
-            if (sound_modules[i]->Init(use_sfx_prefix))
-            {
-                sound_module = sound_modules[i];
-                return;
-            }
-        }
+        sound_module = tmp;
     }
 }
 
@@ -160,27 +115,14 @@ static void InitSfxModule(boolean use_sfx_prefix)
 
 static void InitMusicModule(void)
 {
-    int i;
+    music_module_t* tmp;
 
     music_module = NULL;
+    tmp = I_Platform_GetMusicModule();
 
-    for (i=0; music_modules[i] != NULL; ++i)
+    if (tmp && tmp->Init())
     {
-        // Is the music device in the list of devices supported
-        // by this module?
-
-        if (SndDeviceInList(snd_musicdevice, 
-                            music_modules[i]->sound_devices,
-                            music_modules[i]->num_sound_devices))
-        {
-            // Initialize the module
-
-            if (music_modules[i]->Init())
-            {
-                music_module = music_modules[i];
-                return;
-            }
-        }
+        music_module = tmp;
     }
 }
 
@@ -360,7 +302,6 @@ void I_InitMusic(void)
 
 void I_ShutdownMusic(void)
 {
-
 }
 
 void I_SetMusicVolume(int volume)

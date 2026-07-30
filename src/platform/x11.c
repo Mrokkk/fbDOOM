@@ -353,3 +353,13 @@ void I_Platform_ReadEvents(void)
 
     XWarpPointer(display, None, window, 0, 0, 0, 0, image->width / 2, image->height / 2);
 }
+
+struct music_module* I_Platform_GetMusicModule(void)
+{
+    return NULL;
+}
+
+struct sound_module* I_Platform_GetSoundModule(void)
+{
+    return NULL;
+}

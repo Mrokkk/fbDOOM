@@ -594,3 +594,13 @@ void I_Platform_ReadEvents(void)
         D_PostEvent(&event);
     }
 }
+
+struct music_module* I_Platform_GetMusicModule(void)
+{
+    return NULL;
+}
+
+struct sound_module* I_Platform_GetSoundModule(void)
+{
+    return NULL;
+}

@@ -231,3 +231,13 @@ void I_Platform_ReadEvents(void)
 
     SetMousePosition(resx / 2, resy / 2);
 }
+
+struct music_module* I_Platform_GetMusicModule(void)
+{
+    return NULL;
+}
+
+struct sound_module* I_Platform_GetSoundModule(void)
+{
+    return NULL;
+}
