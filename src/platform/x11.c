@@ -76,7 +76,7 @@ static uint8_t X11_GetBitsPerPixel(void)
     return bpp;
 }
 
-static void X11_CalculateMaskAndOffset(unsigned long xmask, uint8_t* out_len, uint8_t* out_offset)
+static void X11_CalculateLenAndOffset(unsigned long xmask, uint8_t* out_len, uint8_t* out_offset)
 {
     uint8_t offset, len;
     for (offset = 0; (xmask & 1) == 0; xmask >>= 1, ++offset);
@@ -89,15 +89,15 @@ static void X11_SetPixelFormat(screen_t* s)
 {
     uint8_t off, len;
 
-    X11_CalculateMaskAndOffset(vinfo->red_mask, &len, &off);
+    X11_CalculateLenAndOffset(vinfo->red_mask, &len, &off);
     s->red.offset   = off;
     s->red.len      = len;
 
-    X11_CalculateMaskAndOffset(vinfo->green_mask, &len, &off);
+    X11_CalculateLenAndOffset(vinfo->green_mask, &len, &off);
     s->green.offset = off;
     s->green.len    = len;
 
-    X11_CalculateMaskAndOffset(vinfo->blue_mask, &len, &off);
+    X11_CalculateLenAndOffset(vinfo->blue_mask, &len, &off);
     s->blue.offset  = off;
     s->blue.len     = len;
 }
@@ -469,6 +469,7 @@ void I_Platform_ReadEvents(void)
                     event.type = ev_quit;
                     event.data1 = 0;
                     event.data2 = 0;
+                    event.data3 = 0;
                     D_PostEvent(&event);
                 }
                 break;

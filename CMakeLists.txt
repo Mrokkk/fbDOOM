@@ -192,6 +192,17 @@ elseif(BACKEND STREQUAL "Raylib")
 
     target_link_libraries(doom PRIVATE platform_raylib)
 
+elseif(BACKEND STREQUAL "SDL2")
+
+    find_package(SDL2)
+
+    add_library(platform_sdl OBJECT src/platform/sdl.c)
+    target_compile_options(platform_sdl PRIVATE -std=c99)
+
+    target_link_libraries(platform_sdl PRIVATE SDL2)
+
+    target_link_libraries(doom PRIVATE platform_sdl)
+
 elseif(BACKEND STREQUAL "Unix")
 
     add_library(platform_unix OBJECT src/platform/unix.c)

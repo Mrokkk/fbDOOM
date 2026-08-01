@@ -148,7 +148,7 @@ static int I_Platform_ConvertToDoomKey(int key)
         FN_KEY(12);
 
         default:
-            if (isprint(key))
+            if (key < 127 && isprint(key))
             {
                 return tolower(key);
             }
