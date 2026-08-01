@@ -6,6 +6,7 @@
 #include <SDL2/SDL_error.h>
 #include <SDL2/SDL_events.h>
 #include <SDL2/SDL_keycode.h>
+#include <SDL2/SDL_mixer.h>
 #include <SDL2/SDL_mouse.h>
 #include <SDL2/SDL_pixels.h>
 #include <SDL2/SDL_rect.h>
@@ -16,6 +17,7 @@
 #include "d_event.h"
 #include "doomkeys.h"
 #include "doomtype.h"
+#include "i_sound.h"
 #include "i_system.h"
 #include "i_video.h"
 #include "m_argv.h"
@@ -271,11 +273,6 @@ void I_Platform_ReadEvents(void)
 }
 
 struct music_module* I_Platform_GetMusicModule(void)
-{
-    return NULL;
-}
-
-struct sound_module* I_Platform_GetSoundModule(void)
 {
     return NULL;
 }

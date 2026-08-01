@@ -99,10 +99,6 @@ typedef enum
 /* Interface for sound modules */
 typedef struct sound_module
 {
-    /* List of sound devices that this sound module is used for. */
-    snddevice_t *sound_devices;
-    int num_sound_devices;
-
     /* Initialise sound module */
     /* Returns true if successfully initialised */
     boolean (*Init)(boolean use_sfx_prefix);

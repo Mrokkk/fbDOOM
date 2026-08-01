@@ -2,3 +2,4 @@
 doom.wad
 compile_commands.json
 tmp
+/wad*

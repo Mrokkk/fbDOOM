@@ -194,12 +194,17 @@ elseif(BACKEND STREQUAL "Raylib")
 
 elseif(BACKEND STREQUAL "SDL2")
 
-    find_package(SDL2)
+    find_package(SDL2 REQUIRED)
+    find_package(SDL2_mixer)
 
     add_library(platform_sdl OBJECT src/platform/sdl.c)
     target_compile_options(platform_sdl PRIVATE -std=c99)
 
-    target_link_libraries(platform_sdl PRIVATE SDL2)
+    if(SDL2_mixer_FOUND)
+        target_sources(platform_sdl PRIVATE src/platform/sdl_sound.c)
+        target_compile_definitions(platform_sdl PUBLIC -DFEATURE_SOUND=1)
+        target_link_libraries(platform_sdl PRIVATE SDL2 SDL2_mixer)
+    endif()
 
     target_link_libraries(doom PRIVATE platform_sdl)
 
