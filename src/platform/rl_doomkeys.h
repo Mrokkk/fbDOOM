@@ -1,31 +1,31 @@
-//
-// Copyright(C) 1993-1996 Id Software, Inc.
-// Copyright(C) 2005-2014 Simon Howard
-//
-// This program is free software; you can redistribute it and/or
-// modify it under the terms of the GNU General Public License
-// as published by the Free Software Foundation; either version 2
-// of the License, or (at your option) any later version.
-//
-// This program is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-// GNU General Public License for more details.
-//
-// DESCRIPTION:
-//       Key definitions
-//
+/*
+ * Copyright(C) 1993-1996 Id Software, Inc.
+ * Copyright(C) 2005-2014 Simon Howard
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * DESCRIPTION:
+ *       Key definitions
+ */
 
 #ifndef __RL_DOOMKEYS__
 #define __RL_DOOMKEYS__
 
-// FIXME: hack for Raylib and Doom using same names for keys
+/* FIXME: hack for Raylib and Doom using same names for keys */
 
-//
-// DOOM keyboard definition.
-// This is the stuff configured by Setup.Exe.
-// Most key data are simple ascii (uppercased).
-//
+/*
+ * DOOM keyboard definition.
+ * This is the stuff configured by Setup.Exe.
+ * Most key data are simple ascii (uppercased).
+ */
 #define D_KEY_RIGHTARROW    0xae
 #define D_KEY_LEFTARROW     0xac
 #define D_KEY_UPARROW       0xad
@@ -62,7 +62,7 @@
 
 #define D_KEY_LALT          D_KEY_RALT
 
-// new keys:
+/* new keys: */
 
 #define D_KEY_CAPSLOCK      (0x80+0x3a)
 #define D_KEY_NUMLOCK       (0x80+0x45)
@@ -95,4 +95,4 @@
 #define D_KEYP_EQUALS       D_KEY_EQUALS
 #define D_KEYP_ENTER        D_KEY_ENTER
 
-#endif          // __RL_DOOMKEYS__
+#endif  /* __RL_DOOMKEYS__ */

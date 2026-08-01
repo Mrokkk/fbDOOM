@@ -56,6 +56,8 @@ void I_Quit (void);
 
 void NORETURN I_Error (char *error, ...);
 
+#define I_ErrorWhen(cond, fmt, ...) if (UNLIKELY(cond)) I_Error(fmt, ##__VA_ARGS__)
+
 #ifdef __phoenix__
 void I_Log(char* fmt, ...);
 #else

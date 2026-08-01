@@ -33,4 +33,4 @@
     } \
     while (0)
 
-#endif // __PLATFORM_PIXEL_FORMAT_H__
+#endif /* __PLATFORM_PIXEL_FORMAT_H__ */

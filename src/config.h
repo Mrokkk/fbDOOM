@@ -28,4 +28,4 @@
 /* Define to the directory where all game files are located */
 #define FILES_DIR "/usr/share/doom"
 
-#endif  // __CONFIG_H__
+#endif  /* __CONFIG_H__ */

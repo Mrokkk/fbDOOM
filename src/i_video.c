@@ -29,7 +29,7 @@
 #include "platform/platform.h"
 
 static screen_t screen;
-static int fb_scaling = 1;
+static int scaling = 1;
 static size_t left_x_offset, right_x_offset, y_offset_bytes;
 static void (*I_DrawScreen)(void);
 
@@ -64,7 +64,7 @@ static color_table_t color_table;
         for (i = 0; i < in_pixels; i++) \
         { \
             color = color_table.table[*in]; \
-            for (j = 0; j < fb_scaling; j++) \
+            for (j = 0; j < scaling; j++) \
             { \
                 __VA_ARGS__; \
             } \
@@ -81,11 +81,11 @@ static color_table_t color_table;
         y = SCREENHEIGHT; \
         while (y--) \
         { \
-            for (i = 0; i < fb_scaling; i++) \
+            for (i = 0; i < scaling; i++) \
             { \
                 line_out += left_x_offset; \
                 I_CMapTo_##table((type*)line_out, line_in, SCREENWIDTH); \
-                line_out += SCREENWIDTH * fb_scaling * screen.bytes_per_pixel + right_x_offset; \
+                line_out += SCREENWIDTH * scaling * screen.bytes_per_pixel + right_x_offset; \
             } \
             line_in += SCREENWIDTH; \
         } \
@@ -129,21 +129,9 @@ DEFINE_DRAWSCREEN_NOSCALING(I_DrawScreen_3Bytes_NoScaling, uint8_t,  width3,  me
 DEFINE_DRAWSCREEN_NOSCALING(I_DrawScreen_2Bytes_NoScaling, uint16_t, width2, *out++ = color);
 DEFINE_DRAWSCREEN_NOSCALING(I_DrawScreen_1Bytes_NoScaling, uint8_t,  width1, *out++ = color);
 
-void I_InitGraphics(void)
+static void I_ScreenRecalculate(void)
 {
     int i, max_scaling;
-
-    I_AtExit(I_ShutdownGraphics, true);
-
-    I_Platform_InitGraphics(&screen);
-
-    if (!screen.red.len && !screen.green.len && !screen.blue.len)
-    {
-        I_Error("Unusable platform screen: invalid colors bit lenghts\n");
-    }
-
-    I_Printf("DOOM screen size: %d x %d\n", SCREENWIDTH, SCREENHEIGHT);
-    I_Printf("Platform screen: %d x %d x %d\n", screen.resx, screen.resy, screen.bits_per_pixel);
 
     max_scaling = MIN(screen.resx / SCREENWIDTH, screen.resy / SCREENHEIGHT);
 
@@ -153,22 +141,22 @@ void I_InitGraphics(void)
         i = atoi(myargv[i + 1]);
         if (i > max_scaling)
         {
-            fb_scaling = max_scaling;
+            scaling = max_scaling;
             I_Printf("Scaling too big: %d, using max value %d\n", i, max_scaling);
         }
         else
         {
-            fb_scaling = i;
-            I_Printf("Scaling factor: %d\n", fb_scaling);
+            scaling = i;
+            I_Printf("Scaling factor: %d\n", scaling);
         }
     }
     else
     {
-        fb_scaling = max_scaling;
-        I_Printf("Auto-scaling factor: %d\n", fb_scaling);
+        scaling = max_scaling;
+        I_Printf("Auto-scaling factor: %d\n", scaling);
     }
 
-    if (fb_scaling == 1)
+    if (scaling == 1)
     {
         switch (screen.bytes_per_pixel)
         {
@@ -209,9 +197,94 @@ void I_InitGraphics(void)
         }
     }
 
-    left_x_offset   = ((screen.resx - (SCREENWIDTH  * fb_scaling))  * screen.bytes_per_pixel) / 2;
-    right_x_offset  = ((screen.resx - (SCREENWIDTH  * fb_scaling))  * screen.bytes_per_pixel) - left_x_offset;
-    y_offset_bytes  = (((screen.resy - (SCREENHEIGHT * fb_scaling)) * screen.bytes_per_pixel) / 2) * screen.resx;
+    left_x_offset   = ((screen.resx - (SCREENWIDTH  * scaling))  * screen.bytes_per_pixel) / 2;
+    right_x_offset  = ((screen.resx - (SCREENWIDTH  * scaling))  * screen.bytes_per_pixel) - left_x_offset;
+    y_offset_bytes  = (((screen.resy - (SCREENHEIGHT * scaling)) * screen.bytes_per_pixel) / 2) * screen.resx;
+}
+
+void I_InitGraphics(void)
+{
+    int i, max_scaling;
+
+    I_AtExit(I_ShutdownGraphics, true);
+
+    I_Platform_InitGraphics(&screen);
+
+    if (!screen.red.len && !screen.green.len && !screen.blue.len)
+    {
+        I_Error("Unusable platform screen: invalid colors bit lenghts\n");
+    }
+
+    I_Printf("DOOM screen size: %d x %d\n", SCREENWIDTH, SCREENHEIGHT);
+    I_Printf("Platform screen: %d x %d x %d\n", screen.resx, screen.resy, screen.bits_per_pixel);
+
+    max_scaling = MIN(screen.resx / SCREENWIDTH, screen.resy / SCREENHEIGHT);
+
+    i = M_CheckParmWithArgs("-scaling", 1);
+    if (i > 0)
+    {
+        i = atoi(myargv[i + 1]);
+        if (i > max_scaling)
+        {
+            scaling = max_scaling;
+            I_Printf("Scaling too big: %d, using max value %d\n", i, max_scaling);
+        }
+        else
+        {
+            scaling = i;
+            I_Printf("Scaling factor: %d\n", scaling);
+        }
+    }
+    else
+    {
+        scaling = max_scaling;
+        I_Printf("Auto-scaling factor: %d\n", scaling);
+    }
+
+    if (scaling == 1)
+    {
+        switch (screen.bytes_per_pixel)
+        {
+            case 4:
+                I_DrawScreen = &I_DrawScreen_4Bytes_NoScaling;
+                break;
+            case 3:
+                I_DrawScreen = &I_DrawScreen_3Bytes_NoScaling;
+                break;
+            case 2:
+                I_DrawScreen = &I_DrawScreen_2Bytes_NoScaling;
+                break;
+            case 1:
+                I_DrawScreen = &I_DrawScreen_1Bytes_NoScaling;
+                break;
+            default:
+                I_Error("Unsupported screen depth: %u\n", screen.bits_per_pixel);
+        }
+    }
+    else
+    {
+        switch (screen.bytes_per_pixel)
+        {
+            case 4:
+                I_DrawScreen = &I_DrawScreen_4Bytes_SoftwareScaling;
+                break;
+            case 3:
+                I_DrawScreen = &I_DrawScreen_3Bytes_SoftwareScaling;
+                break;
+            case 2:
+                I_DrawScreen = &I_DrawScreen_2Bytes_SoftwareScaling;
+                break;
+            case 1:
+                I_DrawScreen = &I_DrawScreen_1Bytes_SoftwareScaling;
+                break;
+            default:
+                I_Error("Unsupported screen depth: %u\n", screen.bits_per_pixel);
+        }
+    }
+
+    left_x_offset   = ((screen.resx - (SCREENWIDTH  * scaling))  * screen.bytes_per_pixel) / 2;
+    right_x_offset  = ((screen.resx - (SCREENWIDTH  * scaling))  * screen.bytes_per_pixel) - left_x_offset;
+    y_offset_bytes  = (((screen.resy - (SCREENHEIGHT * scaling)) * screen.bytes_per_pixel) / 2) * screen.resx;
 
     I_VideoBuffer = Z_Malloc(SCREENWIDTH * SCREENHEIGHT, PU_STATIC, NULL);
 
@@ -239,6 +312,15 @@ WEAK void I_FinishUpdate(void)
 {
     I_DrawScreen();
     I_Platform_RenderFrame();
+}
+
+void I_ResetScreen(uint16_t resx, uint16_t resy, void* pixels)
+{
+    screen.resx = resx;
+    screen.resy = resy;
+    screen.pixels = pixels;
+
+    I_ScreenRecalculate();
 }
 
 void I_ReadScreen(byte* scr)

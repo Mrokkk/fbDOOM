@@ -27,6 +27,7 @@
 #define NORETURN    __attribute__((noreturn))
 #define FALLTHROUGH __attribute__((fallthrough))
 #define WEAK        __attribute__((weak))
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #else
 #error "Unsupported compiler"
 #endif
