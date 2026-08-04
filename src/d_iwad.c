@@ -295,7 +295,7 @@ static void BuildIWADDirList(void)
 
 #endif
 #else
-    AddIWADDir (FILES_DIR);
+    AddIWADDir (DOOM_DATA_DIR);
 
     // Don't run this function again.
 

@@ -271,8 +271,3 @@ void I_Platform_ReadEvents(void)
         }
     }
 }
-
-struct music_module* I_Platform_GetMusicModule(void)
-{
-    return NULL;
-}

@@ -17,6 +17,7 @@
 
 
 
+#include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -384,4 +385,97 @@ boolean I_GetMemoryValue(unsigned int offset, void *value, int size)
     }
 
     return false;
+}
+
+int pipe_fd[2] = {-1, -1};
+static int prev_stdout_fd = -1, prev_stderr_fd = -1;
+
+static int SetNonBlocking(int fd)
+{
+    int flags;
+    if ((flags = fcntl(fd, F_GETFL, 0)) == -1)
+    {
+        return -1;
+    }
+    if ((fcntl(fd, F_SETFL, flags | O_NONBLOCK)) == -1)
+    {
+        return -1;
+    }
+    return 0;
+}
+
+void I_RedirectOutputToBuffer_Start(void)
+{
+    if (pipe(pipe_fd) < 0)
+    {
+        return;
+    }
+
+    prev_stdout_fd = dup(STDOUT_FILENO);
+    prev_stderr_fd = dup(STDERR_FILENO);
+
+    if (SetNonBlocking(pipe_fd[0]) || SetNonBlocking(pipe_fd[1]))
+    {
+        goto error;
+    }
+
+    if (dup2(pipe_fd[1], STDOUT_FILENO) < 0 || dup2(pipe_fd[1], STDERR_FILENO) < 0)
+    {
+        dup2(prev_stdout_fd, STDOUT_FILENO);
+        dup2(prev_stderr_fd, STDERR_FILENO);
+        goto error;
+    }
+
+    return;
+
+error:
+    if (pipe_fd[0] != -1) close(pipe_fd[0]);
+    if (pipe_fd[1] != -1) close(pipe_fd[1]);
+    if (prev_stdout_fd != -1) close(prev_stdout_fd);
+    if (prev_stderr_fd != -1) close(prev_stderr_fd);
+    prev_stdout_fd = -1;
+    prev_stderr_fd = -1;
+    pipe_fd[0] = -1;
+    pipe_fd[1] = -1;
+}
+
+#define CHUNK_SIZE 0x1000
+
+char* I_GetRedirectedOutput(void)
+{
+    int    r;
+    size_t cur;
+    size_t cur_size;
+    char*  buf;
+
+    cur    = 0;
+    buf    = malloc(cur_size = CHUNK_SIZE);
+    buf[0] = 0;
+
+    if (pipe_fd[0] != -1)
+    {
+        while ((r = read(pipe_fd[0], buf + cur, CHUNK_SIZE)) > 0)
+        {
+            if (r == CHUNK_SIZE)
+            {
+                cur += CHUNK_SIZE;
+                buf = realloc(buf, cur_size += CHUNK_SIZE);
+            }
+            else
+            {
+                buf[r] = 0;
+            }
+        }
+    }
+    return buf;
+}
+
+void I_RedirectOutputToBuffer_End(void)
+{
+    dup2(prev_stdout_fd, STDOUT_FILENO);
+    dup2(prev_stderr_fd, STDERR_FILENO);
+    prev_stdout_fd = -1;
+    prev_stderr_fd = -1;
+    pipe_fd[0] = -1;
+    pipe_fd[1] = -1;
 }

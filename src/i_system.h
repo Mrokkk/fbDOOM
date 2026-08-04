@@ -92,4 +92,8 @@ void I_PrintBanner(char *text);
 
 void I_PrintDivider(void);
 
+void I_RedirectOutputToBuffer_Start(void);
+char* I_GetRedirectedOutput(void);
+void I_RedirectOutputToBuffer_End(void);
+
 #endif

@@ -2109,7 +2109,7 @@ float M_GetFloatVariable(char *name)
 
 static char *GetDefaultConfigDir(void)
 {
-    return FILES_DIR;
+    return DOOM_DATA_DIR;
 }
 
 // 

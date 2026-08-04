@@ -142,10 +142,6 @@ void I_PrecacheSounds(sfxinfo_t *sounds, int num_sounds);
 /* Interface for music modules */
 typedef struct music_module
 {
-    /* List of sound devices that this music module is used for. */
-    snddevice_t *sound_devices;
-    int num_sound_devices;
-
     /* Initialise the music subsystem */
     boolean (*Init)(void);
 

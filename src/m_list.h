@@ -80,7 +80,7 @@ static inline void M_ListDel(list_head_t* entry)
 #define M_ListForEach(pos, head) \
     for (pos = (head)->next; pos != (head); pos = pos->next)
 
-#define M_ListForEach_entry(pos, head, member) \
+#define M_ListForEachEntry(pos, head, member) \
     for (pos = M_ListEntry((head)->next, typeof(*pos), member); \
          &pos->member != (head); \
          pos = M_ListEntry(pos->member.next, typeof(*pos), member))

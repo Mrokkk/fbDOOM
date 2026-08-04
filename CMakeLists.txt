@@ -2,18 +2,24 @@ cmake_minimum_required(VERSION 3.14)
 
 project(fbDOOM C)
 
+include(GNUInstallDirs)
+
 option(LTO         "Enable Link Time Optimization" OFF)
 option(OPTIMIZE    "Enable compiler optimizations" ON)
 option(SANITIZE    "Enable ASan and UBsan"         OFF)
 option(PROFILE     "Enable profiling"              OFF)
 
 set(BACKEND "Unix" CACHE STRING "Used platform")
+set(DOOM_DATA_DIR "${CMAKE_INSTALL_FULL_DATADIR}/doom" CACHE STRING "DOOM data dir used by game")
 
 message(STATUS "Enable Link Time Optimization: ${LTO}")
 message(STATUS "Enable compiler optimizations: ${OPTIMIZE}")
 message(STATUS "Enable ASan and UBsan:         ${SANITIZE}")
 message(STATUS "Enable profiling:              ${PROFILE}")
 message(STATUS "Platform:                      ${BACKEND}")
+message(STATUS "Install binary dir:            ${CMAKE_INSTALL_FULL_BINDIR}")
+message(STATUS "Install data dir:              ${CMAKE_INSTALL_FULL_DATADIR}")
+message(STATUS "Builtin data dir:              ${DOOM_DATA_DIR}")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -21,6 +27,10 @@ execute_process(
     COMMAND ${CMAKE_COMMAND} -E create_symlink
         ${CMAKE_BINARY_DIR}/compile_commands.json
         ${CMAKE_SOURCE_DIR}/compile_commands.json
+)
+
+add_definitions(
+    -DDOOM_DATA_DIR=\"${DOOM_DATA_DIR}\"
 )
 
 set(CMAKE_C_STANDARD 90)
@@ -201,9 +211,10 @@ elseif(BACKEND STREQUAL "SDL2")
     target_compile_options(platform_sdl PRIVATE -std=c99)
 
     if(SDL2_mixer_FOUND)
-        target_sources(platform_sdl PRIVATE src/platform/sdl_sound.c)
+        target_sources(platform_sdl PRIVATE src/platform/sdl_sound.c src/mus2mid/mus2mid.c)
         target_compile_definitions(platform_sdl PUBLIC -DFEATURE_SOUND=1)
         target_link_libraries(platform_sdl PRIVATE SDL2 SDL2_mixer)
+        set(WITH_SOUND ON)
     endif()
 
     target_link_libraries(doom PRIVATE platform_sdl)
@@ -217,4 +228,17 @@ else()
     message(FATAL_ERROR "Unrecognized platform: ${BACKEND}")
 endif()
 
-install(TARGETS doom)
+install(TARGETS doom DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
+install(FILES "${CMAKE_SOURCE_DIR}/default.cfg" DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/doom)
+
+if(WITH_SOUND)
+
+    execute_process(
+        COMMAND ${CMAKE_COMMAND} -E create_symlink
+            ${CMAKE_SOURCE_DIR}/soundfont/gzdoom.sf2
+            ${CMAKE_BINARY_DIR}/gzdoom.sf2
+    )
+
+    install(FILES "${CMAKE_SOURCE_DIR}/soundfont/gzdoom.sf2" DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/doom)
+
+endif()

@@ -25,7 +25,4 @@
 /* Define to 1 if you want to compile the unmodified code */
 #undef ORIGCODE
 
-/* Define to the directory where all game files are located */
-#define FILES_DIR "/usr/share/doom"
-
 #endif  /* __CONFIG_H__ */
