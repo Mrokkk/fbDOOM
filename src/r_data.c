@@ -482,6 +482,7 @@ void R_InitTextures (void)
     int			temp2;
     int			temp3;
 
+    UNUSED(totalwidth);
     
     // Load the patch names from pnames.lmp.
     name[8] = 0;

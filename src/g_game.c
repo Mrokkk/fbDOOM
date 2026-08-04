@@ -15,11 +15,10 @@
 // DESCRIPTION:  none
 //
 
-
-
-#include <string.h>
-#include <stdlib.h>
 #include <math.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "doomdef.h" 
 #include "doomkeys.h"

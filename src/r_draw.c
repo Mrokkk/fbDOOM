@@ -287,6 +287,8 @@ void R_DrawFuzzColumn (void)
     fixed_t		frac;
     fixed_t		fracstep;	 
 
+    UNUSED(frac);
+
     // Adjust borders. Low... 
     if (!dc_yl) 
 	dc_yl = 1;
@@ -347,6 +349,8 @@ void R_DrawFuzzColumnLow (void)
     fixed_t		frac;
     fixed_t		fracstep;	 
     int x;
+
+    UNUSED(frac);
 
     // Adjust borders. Low... 
     if (!dc_yl) 

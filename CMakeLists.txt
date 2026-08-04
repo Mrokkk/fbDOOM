@@ -19,7 +19,7 @@ message(STATUS "Enable profiling:              ${PROFILE}")
 message(STATUS "Platform:                      ${BACKEND}")
 message(STATUS "Install binary dir:            ${CMAKE_INSTALL_FULL_BINDIR}")
 message(STATUS "Install data dir:              ${CMAKE_INSTALL_FULL_DATADIR}")
-message(STATUS "Builtin data dir:              ${DOOM_DATA_DIR}")
+message(STATUS "DOOM data dir:                 ${DOOM_DATA_DIR}")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -211,7 +211,7 @@ elseif(BACKEND STREQUAL "SDL2")
     target_compile_options(platform_sdl PRIVATE -std=c99)
 
     if(SDL2_mixer_FOUND)
-        target_sources(platform_sdl PRIVATE src/platform/sdl_sound.c src/mus2mid/mus2mid.c)
+        target_sources(platform_sdl PRIVATE src/platform/sdl_sound.c)
         target_compile_definitions(platform_sdl PUBLIC -DFEATURE_SOUND=1)
         target_link_libraries(platform_sdl PRIVATE SDL2 SDL2_mixer)
         set(WITH_SOUND ON)
@@ -232,6 +232,8 @@ install(TARGETS doom DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
 install(FILES "${CMAKE_SOURCE_DIR}/default.cfg" DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/doom)
 
 if(WITH_SOUND)
+
+    target_sources(doom PRIVATE src/mus2mid/mus2mid.c)
 
     execute_process(
         COMMAND ${CMAKE_COMMAND} -E create_symlink

@@ -18,12 +18,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#ifdef ORIGCODE
-#include "SDL_mixer.h"
-#endif
-
-#include "config.h"
-#include "doomfeatures.h"
 #include "doomtype.h"
 
 #ifdef ORIGCODE
@@ -32,7 +26,6 @@
 #include "i_sound.h"
 #include "i_video.h"
 #include "m_argv.h"
-#include "m_config.h"
 #include "platform/platform.h"
 
 // Sound sample rate to use for digital output (Hz)
@@ -77,24 +70,6 @@ static int snd_sbirq = 0;
 static int snd_sbdma = 0;
 static int snd_mport = 0;
 #endif
-
-// Check if a sound device is in the given list of devices
-
-static boolean SndDeviceInList(snddevice_t device, snddevice_t *list,
-                               int len)
-{
-    int i;
-
-    for (i=0; i<len; ++i)
-    {
-        if (device == list[i])
-        {
-            return true;
-        }
-    }
-
-    return false;
-}
 
 // Find and initialize a sound_module_t appropriate for the setting
 // in snd_sfxdevice.

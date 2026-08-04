@@ -15,15 +15,13 @@
 // DESCRIPTION:
 //
 
-
-
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <unistd.h>
-#include <syslog.h>
 
 #include "config.h"
 #include "doomtype.h"
@@ -261,6 +259,8 @@ void I_Error (char *error, ...)
 }
 
 #ifdef __phoenix__
+#include <syslog.h>
+
 void I_Log(char* fmt, ...)
 {
     static int initialized = 0;

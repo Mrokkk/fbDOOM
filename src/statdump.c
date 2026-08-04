@@ -29,6 +29,8 @@
 
 #include "statdump.h"
 
+#if ORIGCODE
+
 /* Par times for E1M1-E1M9. */
 static const int doom1_par_times[] =
 {
@@ -40,8 +42,6 @@ static const int doom2_par_times[] =
 {
     30, 90, 120, 120, 90, 150, 120, 120, 270,
 };
-
-#if ORIGCODE
 
 /* Player colors. */
 static const char *player_colors[] =

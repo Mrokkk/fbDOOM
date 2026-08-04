@@ -17,7 +17,6 @@
 #include "d_event.h"
 #include "doomkeys.h"
 #include "doomtype.h"
-#include "i_sound.h"
 #include "i_system.h"
 #include "i_video.h"
 #include "m_argv.h"
@@ -32,8 +31,7 @@ static uint32_t* image;
 static void CalculateLen(unsigned long mask, uint8_t* out_len)
 {
     uint8_t len;
-    uint8_t offset;
-    for (offset = 0; (mask & 1) == 0; mask >>= 1, ++offset);
+    for (; (mask & 1) == 0; mask >>= 1);
     for (len = 0; mask; mask >>= 1, ++len);
     *out_len = len;
 }
