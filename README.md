@@ -6,7 +6,7 @@ To build:
 ```
 mkdir build
 cd build
-cmake -DBACKEND=<backend, see below> -DCMAKE_INSTALL_PREFIX=<install root> ..
+cmake -DBACKEND=<backend, see below> -DCMAKE_BUILD_TYPE=<build type> -DCMAKE_INSTALL_PREFIX=<install root> ..
 make install -j$(nproc)
 ```
 
@@ -16,7 +16,7 @@ Backends:
 * X11: software rendering and scaling, no sound
 * Unix: software rendering and scaling, drawing to /dev/fb0, no sound
 
-# Original readme
+## Original readme
 
 > Here it is, at long last.  The DOOM source code is released for your
 > non-profit use.  You still need real DOOM data to work with this code.

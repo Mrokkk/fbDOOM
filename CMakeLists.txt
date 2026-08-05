@@ -1,25 +1,20 @@
 cmake_minimum_required(VERSION 3.14)
 
-project(fbDOOM C)
+project(doom C)
 
 include(GNUInstallDirs)
+include(cmake/build_types.cmake)
 
-option(LTO         "Enable Link Time Optimization" OFF)
-option(OPTIMIZE    "Enable compiler optimizations" ON)
+option(DEBUG_INFO  "Enable debug info"             ${DEF_DEBUG_INFO})
+option(OPTIMIZE    "Enable compiler optimizations" ${DEF_OPTIMIZE})
+option(LTO         "Enable Link Time Optimization" ${DEF_LTO})
 option(SANITIZE    "Enable ASan and UBsan"         OFF)
 option(PROFILE     "Enable profiling"              OFF)
 
-set(BACKEND "Unix" CACHE STRING "Used platform")
+if(NOT BACKEND)
+    set(BACKEND "Unix" CACHE STRING "Used platform")
+endif()
 set(DOOM_DATA_DIR "${CMAKE_INSTALL_FULL_DATADIR}/doom" CACHE STRING "DOOM data dir used by game")
-
-message(STATUS "Enable Link Time Optimization: ${LTO}")
-message(STATUS "Enable compiler optimizations: ${OPTIMIZE}")
-message(STATUS "Enable ASan and UBsan:         ${SANITIZE}")
-message(STATUS "Enable profiling:              ${PROFILE}")
-message(STATUS "Platform:                      ${BACKEND}")
-message(STATUS "Install binary dir:            ${CMAKE_INSTALL_FULL_BINDIR}")
-message(STATUS "Install data dir:              ${CMAKE_INSTALL_FULL_DATADIR}")
-message(STATUS "DOOM data dir:                 ${DOOM_DATA_DIR}")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
@@ -34,12 +29,16 @@ add_definitions(
 )
 
 set(CMAKE_C_STANDARD 90)
-add_compile_options(-pipe -ggdb3 -Wall -Wextra -fdata-sections -ffunction-sections -Wno-unused-parameter)
+add_compile_options(-pipe -Wall -Wextra -fdata-sections -ffunction-sections -Wno-unused-parameter)
 
 if(CMAKE_C_COMPILER_ID STREQUAL "Clang" OR CMAKE_C_COMPILER_ID STREQUAL "GNU")
     add_link_options(-Wl,--gc-sections)
 elseif(CMAKE_C_COMPILER_ID STREQUAL "TinyCC")
     add_link_options(-Wl,-lm)
+endif()
+
+if(DEBUG_INFO)
+    add_compile_options(-ggdb3)
 endif()
 
 if(PROFILE)
@@ -61,7 +60,7 @@ endif()
 
 include_directories(src)
 
-add_executable(doom
+add_executable(${PROJECT_NAME}
 
     src/am_map.c
     src/d_event.c
@@ -146,94 +145,16 @@ add_executable(doom
 
 )
 
-if(BACKEND STREQUAL "X11")
+set(SOUND_AVAILABLE OFF CACHE INTERNAL "")
 
-    find_package(X11)
+function(link_to_doom target)
+    target_link_libraries(${PROJECT_NAME} PRIVATE ${target})
+endfunction()
 
-    add_library(platform_x11 OBJECT src/platform/x11.c)
-    target_include_directories(platform_x11 PRIVATE ${X11_INCLUDE_DIR})
-    target_link_libraries(platform_x11 PUBLIC ${X11_LIBRARIES})
-
-    target_link_libraries(doom PRIVATE platform_x11)
-
-elseif(BACKEND STREQUAL "Raylib")
-
-    include(FindPkgConfig)
-    pkg_check_modules(RAYLIB raylib)
-
-    add_library(platform_raylib OBJECT src/platform/raylib.c)
-    target_compile_options(platform_raylib PRIVATE -std=c99)
-
-    if(USE_OWN_RAYLIB OR NOT RAYLIB_FOUND)
-        include(FetchContent)
-        set(FETCHCONTENT_UPDATES_DISCONNECTED ON)
-
-        FetchContent_Declare(raylib
-            SYSTEM
-            GIT_REPOSITORY https://github.com/raysan5/raylib
-            GIT_TAG dbc56a87da87d973a9c5baa4e7438a9d20121d28 # tag: 6.0
-        )
-        FetchContent_MakeAvailable(raylib)
-
-        target_compile_definitions(raylib PUBLIC -DSUPPORT_SCREEN_CAPTURE=0)
-
-        target_compile_options(raylib PRIVATE -O3 -ggdb3)
-        target_compile_definitions(raylib PRIVATE
-            -DSUPPORT_MODULE_RSHAPES=0
-            -DSUPPORT_MODULE_RMODELS=0
-            -DSUPPORT_CAMERA_SYSTEM=0
-            -DSUPPORT_GESTURES_SYSTEM=0
-            -DSUPPORT_MOUSE_GESTURES=0
-            -DSUPPORT_MESH_GENERATION=0
-            -DSUPPORT_FILEFORMAT_OBJ=0
-            -DSUPPORT_FILEFORMAT_MTL=0
-            -DSUPPORT_FILEFORMAT_IQM=0
-            -DSUPPORT_FILEFORMAT_GLTF=0
-            -DSUPPORT_FILEFORMAT_VOX=0
-            -DSUPPORT_FILEFORMAT_M3D=0
-        )
-
-        target_link_libraries(platform_raylib PRIVATE raylib)
-    else()
-        target_link_libraries(platform_raylib PRIVATE ${RAYLIB_LIBRARIES})
-        target_link_directories(platform_raylib PRIVATE ${RAYLIB_LIBRARY_DIRS})
-        target_include_directories(platform_raylib PRIVATE ${RAYLIB_INCLUDE_DIRS})
-    endif()
-
-    target_link_libraries(doom PRIVATE platform_raylib)
-
-elseif(BACKEND STREQUAL "SDL2")
-
-    find_package(SDL2 REQUIRED)
-    find_package(SDL2_mixer)
-
-    add_library(platform_sdl OBJECT src/platform/sdl.c)
-    target_compile_options(platform_sdl PRIVATE -std=c99)
-
-    if(SDL2_mixer_FOUND)
-        target_sources(platform_sdl PRIVATE src/platform/sdl_sound.c)
-        target_compile_definitions(platform_sdl PUBLIC -DFEATURE_SOUND=1)
-        target_link_libraries(platform_sdl PRIVATE SDL2 SDL2_mixer)
-        set(WITH_SOUND ON)
-    endif()
-
-    target_link_libraries(doom PRIVATE platform_sdl)
-
-elseif(BACKEND STREQUAL "Unix")
-
-    add_library(platform_unix OBJECT src/platform/unix.c)
-    target_link_libraries(doom PRIVATE platform_unix)
-
-else()
-    message(FATAL_ERROR "Unrecognized platform: ${BACKEND}")
-endif()
-
-install(TARGETS doom DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
-install(FILES "${CMAKE_SOURCE_DIR}/default.cfg" DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/doom)
-
-if(WITH_SOUND)
-
-    target_sources(doom PRIVATE src/mus2mid/mus2mid.c)
+function(enable_sound)
+    set(SOUND_AVAILABLE ON CACHE INTERNAL "")
+    add_compile_definitions(-DFEATURE_SOUND=1)
+    target_sources(${PROJECT_NAME} PRIVATE src/mus2mid/mus2mid.c)
 
     execute_process(
         COMMAND ${CMAKE_COMMAND} -E create_symlink
@@ -242,5 +163,21 @@ if(WITH_SOUND)
     )
 
     install(FILES "${CMAKE_SOURCE_DIR}/soundfont/gzdoom.sf2" DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/doom)
+endfunction()
 
-endif()
+include(cmake/platform_${BACKEND}.cmake)
+
+message(STATUS "Build type:                    ${CMAKE_BUILD_TYPE}")
+message(STATUS "Enable debug info:             ${DEBUG_INFO}")
+message(STATUS "Enable compiler optimizations: ${OPTIMIZE}")
+message(STATUS "Enable Link Time Optimization: ${LTO}")
+message(STATUS "Enable ASan and UBsan:         ${SANITIZE}")
+message(STATUS "Enable profiling:              ${PROFILE}")
+message(STATUS "Platform:                      ${BACKEND}")
+message(STATUS "Sound support available:       ${SOUND_AVAILABLE}")
+message(STATUS "Install binary dir:            ${CMAKE_INSTALL_FULL_BINDIR}")
+message(STATUS "Install data dir:              ${CMAKE_INSTALL_FULL_DATADIR}")
+message(STATUS "DOOM data dir:                 ${DOOM_DATA_DIR}")
+
+install(TARGETS ${PROJECT_NAME} DESTINATION ${CMAKE_INSTALL_FULL_BINDIR})
+install(FILES "${CMAKE_SOURCE_DIR}/default.cfg" DESTINATION ${CMAKE_INSTALL_FULL_DATADIR}/doom)
