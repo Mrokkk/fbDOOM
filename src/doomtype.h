@@ -46,7 +46,9 @@
 
 #include <inttypes.h>
 
-typedef int boolean;
+typedef uint8_t byte;
+
+typedef byte boolean;
 
 #ifndef false
 #define false 0
@@ -55,8 +57,6 @@ typedef int boolean;
 #ifndef true
 #define true 1
 #endif
-
-typedef uint8_t byte;
 
 #include <limits.h>
 
