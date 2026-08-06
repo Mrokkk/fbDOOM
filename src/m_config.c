@@ -1778,13 +1778,13 @@ static void LoadDefaultCollection(default_collection_t *collection)
     char defname[80];
     char strparm[100];
 
-    // read the file in, overriding any set defaults
+    /* read the file in, overriding any set defaults */
     f = fopen(collection->filename, "r");
 
     if (f == NULL)
     {
-        // File not opened, but don't complain. 
-        // It's probably just the first time they ran the game.
+        /* File not opened, but don't complain.
+         * It's probably just the first time they ran the game. */
 
         return;
     }
@@ -1793,34 +1793,33 @@ static void LoadDefaultCollection(default_collection_t *collection)
     {
         if (fscanf(f, "%79s %99[^\n]\n", defname, strparm) != 2)
         {
-            // This line doesn't match
+            /* This line doesn't match */
 
             continue;
         }
 
-        // Find the setting in the list
+        /* Find the setting in the list */
 
         def = SearchCollection(collection, defname);
 
         if (def == NULL || !def->bound)
         {
-            // Unknown variable?  Unbound variables are also treated
-            // as unknown.
+            /* Unknown variable?  Unbound variables are also treated
+             * as unknown. */
 
             continue;
         }
 
-        // Strip off trailing non-printable characters (\r characters
-        // from DOS text files)
+        /* Strip off trailing non-printable characters (\r characters
+         * from DOS text files) */
 
         while (strlen(strparm) > 0 && !isprint(strparm[strlen(strparm)-1]))
         {
             strparm[strlen(strparm)-1] = '\0';
         }
 
-        // Surrounded by quotes? If so, remove them.
-        if (strlen(strparm) >= 2
-         && strparm[0] == '"' && strparm[strlen(strparm) - 1] == '"')
+        /* Surrounded by quotes? If so, remove them. */
+        if (strlen(strparm) >= 2 && strparm[0] == '"' && strparm[strlen(strparm) - 1] == '"')
         {
             strparm[strlen(strparm) - 1] = '\0';
             memmove(strparm, strparm + 1, sizeof(strparm) - 1);
@@ -1887,10 +1886,16 @@ static void LoadDefaultCollection(default_collection_t *collection)
 
         if (def == NULL || !def->bound)
         {
-            // Unknown variable?  Unbound variables are also treated
-            // as unknown.
+            /* Unknown variable?  Unbound variables are also treated as unknown. */
             printf("  %s:%u: Unknown variable: %s\n", collection->filename, line_nr, key);
             continue;
+        }
+
+        /* Surrounded by quotes? If so, remove them. */
+        if (strlen(value) >= 2 && value[0] == '"' && value[strlen(value) - 1] == '"')
+        {
+            value[strlen(value) - 1] = '\0';
+            memmove(value, value + 1, sizeof(value) - 1);
         }
 
         SetVariable(def, value);
